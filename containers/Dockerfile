@@ -1,6 +1,4 @@
 ﻿# SeCAT v4.1
-# Alignment: DECIPHER (R/Bioconductor)
-# Clustering: VSEARCH
 FROM rocker/r-ver:4.3.2
 
 ENV LC_ALL=C
@@ -24,9 +22,22 @@ RUN VSEARCH_VERSION=2.23.0 && \
 
 RUN R --no-save --no-restore -e "\
     options(repos = c(CRAN = 'https://cloud.r-project.org')); \
-    install.packages(c('tidyverse','data.table','here','vegan','changepoint', \
-                       'magick','patchwork','gridExtra','ggrepel','fs', \
-                       'scales','digest','tibble'), dependencies = TRUE)"
+    install.packages(c('ggplot2','dplyr','tidyr','readr','purrr','tibble', \
+                       'stringr','forcats','lubridate'), dependencies = TRUE)"
+
+RUN R --no-save --no-restore -e "\
+    options(repos = c(CRAN = 'https://cloud.r-project.org')); \
+    install.packages(c('data.table','here','vegan','changepoint', \
+                       'patchwork','gridExtra','ggrepel','fs', \
+                       'scales','digest'), dependencies = TRUE)"
+
+RUN R --no-save --no-restore -e "\
+    options(repos = c(CRAN = 'https://cloud.r-project.org')); \
+    install.packages('magick', dependencies = TRUE)"
+
+RUN R --no-save --no-restore -e "\
+    options(repos = c(CRAN = 'https://cloud.r-project.org')); \
+    install.packages('tidyverse', dependencies = TRUE)"
 
 RUN R --no-save --no-restore -e "\
     if (!requireNamespace('BiocManager', quietly = TRUE)) \
