@@ -1,4 +1,4 @@
-﻿name: Build and Push Container
+name: Build and Push Container
 
 on:
   push:
@@ -42,6 +42,7 @@ jobs:
             TAGS="$TAGS,ghcr.io/derbydt/secat:${VERSION}"
           fi
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "Building with tags: $TAGS"
 
       - name: Build and push Docker image to GHCR
         uses: docker/build-push-action@v5
@@ -50,6 +51,8 @@ jobs:
           file: containers/Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          # Cache layers between runs to speed up rebuilds
+          no-cache: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -57,5 +60,5 @@ jobs:
         run: |
           docker pull ghcr.io/derbydt/secat:latest
           docker run --rm ghcr.io/derbydt/secat:latest \
-              Rscript -e "library(DECIPHER); library(vegan); cat('Packages OK\n')"
+              Rscript -e "cat('R OK\n'); library(DECIPHER); library(vegan); cat('Packages OK\n')"
           docker run --rm ghcr.io/derbydt/secat:latest vsearch --version
