@@ -1,0 +1,2 @@
+study_name	primer_name	fwd_seq	rev_seq	initial_fwd_trim	initial_rev_trim	asv_fasta_path	asv_counts_path	taxonomy_path	metadata_path	metadata_variable	metadata_value
+Study_A	515F_806R	GTGYCAGCMGCCGCGGTAA	GGACTACNVGGGTWTCTAAT	0	0	/path/to/StudyA/dna-sequences.fasta	/path/to/StudyA/feature-table.tsv	/path/to/StudyA/taxonomy.tsv	/path/to/StudyA/metadata.tsv	HolobiontArea	Rhizosphere
