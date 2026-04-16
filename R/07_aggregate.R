@@ -926,7 +926,7 @@ main <- function() {
 
     log_and_flush("  -> Generating verdicts...")
     target_trim <- current_study_data$target_trim_bp
-    real_curve <- current_study_data$dissim_data %>% arrange(Trim_BP) %>% mutate(Trim_Step = dense_rank(Trim_BP) - 1)
+    real_curve <- current_study_data$dissim_data %>% dplyr::filter(mode == "both") %>% dplyr::arrange(Trim_BP) %>% mutate(Trim_Step = dense_rank(Trim_BP) - 1)
     sim_baseline_for_task <- sim_data_for_task %>% dplyr::filter(Trim_BP == 0)
 
     # --- OUTLIER LOGIC: Check once per study, before level loop ---

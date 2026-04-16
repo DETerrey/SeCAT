@@ -1416,17 +1416,21 @@ calculate_max_valid_trim <- function(otu_tables_per_level, increment = NULL) {
 #   @return [data.frame] - A tibble with columns `Level`, `Trim_BP`, `Dissimilarity`.
 #-------------------------------------------------------------------------------
 
-calculate_dissimilarity_over_trims <- function(otu_tables_per_level, num_steps, increment = 10) {
+#-------------------------------------------------------------------------------
+# Function:   calculate_dissimilarity
+#-------------------------------------------------------------------------------
+calculate_dissimilarity <- function(otu_tables_per_level, num_steps, increment = 10) {
+
   dissimilarity_results <- list()
 
   for (level in get_levels()) {
-    trim_bps <- (0:num_steps) * increment
+    trim_bps <- seq(0, num_steps * increment, by = increment)
     dissim_values <- rep(NA_real_, length(trim_bps))
 
     original_table <- otu_tables_per_level[["0"]][[level]]
 
     if (is.null(original_table) || nrow(original_table) == 0) {
-      message(paste("  WARNING: No OTU table for level", level, "at Trim_BP=0. Skipping dissimilarity calculation."))
+      message(paste("  WARNING: No OTU table for level", level, "at TrimBP=0. Skipping dissimilarity calculation."))
       next
     }
 
@@ -1436,26 +1440,22 @@ calculate_dissimilarity_over_trims <- function(otu_tables_per_level, num_steps, 
       next
     }
 
-    # Convert to data.frame and set rownames for reliable indexing
-    original_numeric_df <- as.data.frame(original_table[, sample_cols, drop = FALSE])
+    original_numeric_df <- as.data.frame(original_table)[, sample_cols, drop = FALSE]
     taxa_names <- as.character(original_table[[level]])
-
+    
     if (anyDuplicated(taxa_names)) {
-        warning(paste("Duplicate taxon names found at level", level, ". Making them unique for alignment."))
-        taxa_names <- make.unique(taxa_names)
+      taxa_names <- make.unique(taxa_names)
     }
-
     rownames(original_numeric_df) <- taxa_names
     original_numeric_df[is.na(original_numeric_df)] <- 0
+    
     original_filtered <- original_numeric_df[rowSums(original_numeric_df) > 0, , drop = FALSE]
-    original_nonzero <- sum(original_filtered > 0)
-
-    if (original_nonzero == 0) {
-      message(paste("  WARNING: All zero counts at level", level, "Trim_BP=0"))
+    
+    if (sum(original_filtered) == 0) {
+      message(paste("  WARNING: All zero counts at level", level, "TrimBP=0"))
       next
     }
 
-    # Baseline dissimilarity is always 0
     dissim_values[1] <- 0
     total_loss_reached <- FALSE
 
@@ -1467,6 +1467,7 @@ calculate_dissimilarity_over_trims <- function(otu_tables_per_level, num_steps, 
 
       trim_val <- i * increment
       trim_key <- as.character(trim_val)
+
       trimmed_table <- otu_tables_per_level[[trim_key]][[level]]
 
       if (is.null(trimmed_table) || nrow(trimmed_table) == 0) {
@@ -1475,100 +1476,68 @@ calculate_dissimilarity_over_trims <- function(otu_tables_per_level, num_steps, 
         next
       }
 
-      # Convert trimmed table to data.frame
-      trimmed_numeric_df <- as.data.frame(trimmed_table[, sample_cols, drop = FALSE])
+      trimmed_numeric_df <- as.data.frame(trimmed_table)[, sample_cols, drop = FALSE]
       taxa_names_trimmed <- as.character(trimmed_table[[level]])
-
+      
       if (anyDuplicated(taxa_names_trimmed)) {
-          taxa_names_trimmed <- make.unique(taxa_names_trimmed)
+        taxa_names_trimmed <- make.unique(taxa_names_trimmed)
       }
-
       rownames(trimmed_numeric_df) <- taxa_names_trimmed
       trimmed_numeric_df[is.na(trimmed_numeric_df)] <- 0
+      
       trimmed_filtered <- trimmed_numeric_df[rowSums(trimmed_numeric_df) > 0, , drop = FALSE]
-      trimmed_nonzero <- sum(trimmed_filtered > 0)
-
-      if (trimmed_nonzero == 0) {
+      
+      if (sum(trimmed_filtered) == 0) {
         dissim_values[i + 1] <- 1.0
         total_loss_reached <- TRUE
         next
       }
 
-      # === CRITICAL FIX: Use proper data.frame subsetting instead of matrix alignment ===
-      # Get union of all taxa present in either baseline or current step
       all_taxa <- unique(c(rownames(original_filtered), rownames(trimmed_filtered)))
 
-      # Create aligned data frames (not matrices) with proper row indexing
-      # This ensures both frames have exactly the same rows in the same order
-      original_aligned <- data.frame(matrix(0, nrow = length(all_taxa), ncol = ncol(original_filtered)))
-      trimmed_aligned <- data.frame(matrix(0, nrow = length(all_taxa), ncol = ncol(trimmed_filtered)))
-      colnames(original_aligned) <- colnames(original_filtered)
-      colnames(trimmed_aligned) <- colnames(trimmed_filtered)
-      rownames(original_aligned) <- all_taxa
-      rownames(trimmed_aligned) <- all_taxa
+      original_aligned <- matrix(0, nrow = length(all_taxa), ncol = length(sample_cols), 
+                                 dimnames = list(all_taxa, sample_cols))
+      trimmed_aligned <- matrix(0, nrow = length(all_taxa), ncol = length(sample_cols), 
+                                dimnames = list(all_taxa, sample_cols))
 
-      # Fill in values using proper subsetting
       taxa_in_original <- rownames(original_filtered)
+      original_aligned[taxa_in_original, ] <- as.matrix(original_filtered)
+
       taxa_in_trimmed <- rownames(trimmed_filtered)
+      trimmed_aligned[taxa_in_trimmed, ] <- as.matrix(trimmed_filtered)
 
-      original_aligned[taxa_in_original, ] <- original_filtered[taxa_in_original, ]
-      trimmed_aligned[taxa_in_trimmed, ] <- trimmed_filtered[taxa_in_trimmed, ]
+      sample_dissims <- numeric(ncol(original_aligned))
 
-      # === DIAGNOSTIC ===
-      # Sanity check to ensure alignment logic is working for Genus level
-      if (i == 1 && level == "Genus") {
-        message(paste("=== DISSIMILARITY ALIGNMENT CHECK (Step", i, "- Genus) ==="))
-        message(paste("  Original filtered taxa:", nrow(original_filtered)))
-        message(paste("  Trimmed filtered taxa:", nrow(trimmed_filtered)))
-        message(paste("  All taxa for alignment:", length(all_taxa)))
-        message(paste("  Original aligned sum:", sum(original_aligned)))
-        message(paste("  Trimmed aligned sum:", sum(trimmed_aligned)))
-        message(paste("  Taxa overlap:", length(intersect(taxa_in_original, taxa_in_trimmed))))
-
-        if (sum(original_aligned) == 0) {
-          message("  ERROR: Original aligned matrix is all zeros!")
-          message(paste("  Sample original_filtered rownames:", paste(head(rownames(original_filtered), 3), collapse=", ")))
-          message(paste("  Sample all_taxa:", paste(head(all_taxa, 3), collapse=", ")))
-        }
-      }
-      # === END DIAGNOSTIC ===
-
-      # Convert to matrix for vegan package
-      original_aligned <- as.matrix(original_aligned)
-      trimmed_aligned <- as.matrix(trimmed_aligned)
-
-      sample_dissim <- numeric(ncol(original_aligned))
       for (s in seq_len(ncol(original_aligned))) {
         orig_col <- original_aligned[, s]
         trim_col <- trimmed_aligned[, s]
-        min_taxa_threshold <- 2
+
         orig_nonzero <- sum(orig_col > 0)
         trim_nonzero <- sum(trim_col > 0)
 
-        # Handle edge cases where samples are too sparse for valid Bray-Curtis
-        if (orig_nonzero < min_taxa_threshold || trim_nonzero < min_taxa_threshold) {
+        if (orig_nonzero < 2 && trim_nonzero < 2) {
           shared_taxa <- sum(orig_col > 0 & trim_col > 0)
           max_taxa <- max(orig_nonzero, trim_nonzero)
-          return1 <- ifelse(max_taxa > 0, shared_taxa / max_taxa, 0)
-          sample_dissim[s] <- 1 - return1
+          sample_dissims[s] <- 1 - ifelse(max_taxa > 0, shared_taxa / max_taxa, 0)
         } else {
-          # Calculate Bray-Curtis distance using vegan
-          bc_result <- tryCatch(
-            vegan::vegdist(rbind(orig_col, trim_col), method = "bray")[1],
-            error = function(e) {
-              message(paste("  Bray-Curtis error at step", i, "sample", s, ":", e$message))
-              return(NA_real_)
-            }
-          )
-          sample_dissim[s] <- bc_result
+          bc_result <- tryCatch({
+            vegan::vegdist(rbind(orig_col, trim_col), method = "bray")[1]
+          }, error = function(e) {
+            NA_real_
+          })
+          sample_dissims[s] <- bc_result
         }
       }
 
-      valid_dissim <- sample_dissim[!is.na(sample_dissim)]
-      dissim_values[i + 1] <- if (length(valid_dissim) > 0) mean(valid_dissim) else NA
-
-      # Cap at 1.0 (maximum dissimilarity)
-      if (!is.na(dissim_values[i + 1]) && dissim_values[i + 1] > 0.9999) {
+      valid_dissim <- sample_dissims[!is.na(sample_dissims)]
+      
+      if (length(valid_dissim) > 0) {
+        dissim_values[i + 1] <- mean(valid_dissim)
+      } else {
+        dissim_values[i + 1] <- NA
+      }
+      
+      if (!is.na(dissim_values[i + 1]) && dissim_values[i + 1] >= 0.9999) {
         dissim_values[i + 1] <- 1.0
         total_loss_reached <- TRUE
       }
@@ -1582,10 +1551,8 @@ calculate_dissimilarity_over_trims <- function(otu_tables_per_level, num_steps, 
     )
   }
 
-  if (length(dissimilarity_results) == 0) {
-    return(tibble::tibble())
-  }
-
+  if (length(dissimilarity_results) == 0) return(tibble::tibble())
+  
   dplyr::bind_rows(dissimilarity_results) %>%
     dplyr::arrange(Level, Trim_BP)
 }
@@ -1607,31 +1574,31 @@ calculate_dissimilarity_over_trims <- function(otu_tables_per_level, num_steps, 
 #-------------------------------------------------------------------------------
 
 calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, increment = 10) {
-
+  
   all_retention <- list()
-
+  
   for (level in get_levels()) {
     retention_values <- numeric(num_steps)
-
+    
     # Get the initial (untrimmed) reference table
     initial_table <- otu_tables_per_level[["0"]][[level]]
-
+    
     if (is.null(initial_table) || nrow(initial_table) == 0) {
       retention_values <- rep(0, num_steps)
     } else {
-      # Identify initial taxa present (count > 0 in at least one sample)
+      # Identify initial taxa present (count > 0) in at least one sample
       sample_cols <- names(initial_table)[sapply(initial_table, is.numeric)]
+      
       if(length(sample_cols) > 0) {
         nonzero_mask <- rowSums(initial_table[, sample_cols, drop = FALSE]) > 0
         initial_taxa <- initial_table[[level]][nonzero_mask]
         initial_taxa <- initial_taxa[!is.na(initial_taxa) & initial_taxa != ""]
-
         n_initial <- length(initial_taxa)
-
+        
         for (step in 1:num_steps) {
           trim_key <- as.character(step * increment)
           trimmed_table <- otu_tables_per_level[[trim_key]][[level]]
-
+          
           if (is.null(trimmed_table) || nrow(trimmed_table) == 0) {
             retention_values[step] <- 0
           } else {
@@ -1641,10 +1608,9 @@ calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, incre
               t_nonzero_mask <- rowSums(trimmed_table[, t_sample_cols, drop = FALSE]) > 0
               retained_taxa <- trimmed_table[[level]][t_nonzero_mask]
               retained_taxa <- retained_taxa[!is.na(retained_taxa) & retained_taxa != ""]
-
-              # Count how many *initial* taxa are still present
+              
+              # Count how many initial taxa are still present
               n_retained <- sum(initial_taxa %in% retained_taxa)
-
               retention_values[step] <- if (n_initial > 0) (n_retained / n_initial) * 100 else 0
             } else {
               retention_values[step] <- 0
@@ -1655,16 +1621,16 @@ calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, incre
         retention_values <- rep(0, num_steps)
       }
     }
-
+    
     all_retention[[level]] <- tibble::tibble(
       Level = level,
       TrimStep = 1:num_steps,
-      Trim_BP = (1:num_steps) * increment,
+      TrimBP = (1:num_steps) * increment,
       Retention = retention_values,
       mode = "both"
     )
   }
-
+  
   dplyr::bind_rows(all_retention)
 }
 
