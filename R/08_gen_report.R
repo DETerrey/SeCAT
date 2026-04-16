@@ -33,10 +33,10 @@ suppressPackageStartupMessages(library(tibble))
     library(ggrepel)     # For non-overlapping text labels
     library(scales)      # For pretty axis formatting
     library(gridExtra)   # Legacy grid tools
+    library(png)         # For reading PNG files into R
     library(vegan)       # Biological diversity stats
     library(grid)
     library(gtable)
-    library(magick)      # For stitching PNGs into PDFs
 })
 
 # --- CRITICAL: Define log_and_flush function ---
@@ -77,7 +77,7 @@ log_and_flush("--- Loading shared data ---")
 
 # --- 2a. Load Simulation Baseline Statistics ---
 # This data creates the "Blue/Gray Ribbon" representing the Null Model.
-sim_baselines_path <- here(AGGREGATED_DATA_DIR, "simulation_baseline_statistics.csv")
+sim_baselines_path <- file.path(AGGREGATED_DATA_DIR, "simulation_baseline_statistics.csv")
 sim_baselines <- if (file.exists(sim_baselines_path)) {
     message("✅ Found simulation baseline statistics")
     read_csv(sim_baselines_path, show_col_types = FALSE)
@@ -95,7 +95,7 @@ sim_baselines <- if (file.exists(sim_baselines_path)) {
 
 # --- 2b. Load Simulation Retention Curves ---
 # This data allows us to plot the expected loss of taxa (Alpha Diversity).
-ret_curves_path <- here(AGGREGATED_DATA_DIR, "simulation_retention_curves.csv")
+ret_curves_path <- file.path(AGGREGATED_DATA_DIR, "simulation_retention_curves.csv")
 sim_retention_curves_raw <- if (file.exists(ret_curves_path)) {
   message("✅ Found simulation retention curves (raw data)")
   readr::read_csv(ret_curves_path, show_col_types = FALSE)
@@ -157,7 +157,7 @@ sim_retention_curves <- if (nrow(sim_retention_curves_raw) > 0) {
 
 # --- 2d. Load Master Verdict Table ---
 # This contains the statistical results (Pass/Fail, Thresholds) for all studies.
-master_verdicts_path <- here(AGGREGATED_DATA_DIR, "master_verdict_table.csv")
+master_verdicts_path <- file.path(AGGREGATED_DATA_DIR, "master_verdict_table.csv")
 master_verdicts <- if (file.exists(master_verdicts_path)) {
     message("✅ Found master verdict table")
     read_csv(master_verdicts_path, show_col_types = FALSE)
@@ -1060,8 +1060,8 @@ create_amplicon_alignment_plot <- function(master_manifest, master_verdicts, tax
     }
 
     # --- 1. DYNAMIC COORDINATE LOADING ---
-    study_coords_path <- "output/intermediate/study_alignment_coords.csv"
-    primer_coords_path <- "output/intermediate/primer_coords_phase1_output.csv"
+    study_coords_path <- file.path(OUTDIR, "intermediate/study_alignment_coords.csv")
+    primer_coords_path <- file.path(OUTDIR, "intermediate/primer_coords_phase1_output.csv")
 
     target_path <- NULL
     coords_source <- ""
@@ -1172,7 +1172,7 @@ Is_Warning_Only = !is.na(Consensus_Status) & Consensus_Status == "WARNING_SINGLE
     message(paste("   -> Plotting", nrow(amplicon_data), "studies"))
 
     # --- 3. CONSENSUS REGION LOADING FROM FILE (NEW LOGIC) ---
-    consensus_file <- file.path(OUTDIR, "intermediate/consensusregioninfo.csv")
+    consensus_file <- file.path(OUTDIR, "intermediate", "consensusregioninfo.csv")
     outlier_studies <- character(0)
     consensus_start <- NA
     consensus_end <- NA
@@ -1813,7 +1813,7 @@ create_method_performance_plot <- function() {
 # individual plots, and compiles them into per-study PDF reports.
 # ==============================================================================
 check_report_exists <- function(study_name, primer) {
-  file.exists(here(output_dir, paste0("Report_Fixed_", study_name, "_", primer, ".pdf")))
+  file.exists(file.path(output_dir, paste0("Report_Fixed_", study_name, "_", primer, ".pdf")))
 }
 
 message("--- Processing studies with file existence checks ---")
@@ -2104,16 +2104,20 @@ if (!SKIP_INDIVIDUAL) {
                 gc()
             }
 
-            # Stitch PNGs into PDF using Magick
+            # Write PNGs into PDF using R graphics device (avoids ImageMagick)
             if (length(png_files_for_pdf) > 0) {
                 message(paste("  → Creating PDF with", length(png_files_for_pdf), "pages..."))
                 tryCatch({
-                    image_stack <- image_read(png_files_for_pdf)
-                    pdf_filename <- here(output_dir, paste0("Report_Fixed_", study_name, "_", primer, ".pdf"))
-                    image_write(image_stack, path = pdf_filename, format = "pdf")
+                    pdf_filename <- file.path(output_dir, paste0("Report_Fixed_", study_name, "_", primer, ".pdf"))
+                    pdf(pdf_filename, width = PLOT_WIDTH, height = PLOT_HEIGHT, onefile = TRUE)
+                    for (png_file in png_files_for_pdf) {
+                        img <- png::readPNG(png_file)
+                        grid::grid.newpage()
+                        grid::grid.raster(img)
+                    }
+                    dev.off()
                     message(paste("  ✅ Created:", pdf_filename))
                     successful_reports <- successful_reports + 1
-                    rm(image_stack)
                 }, error = function(e) {
                     message(paste("  ⛔ Error creating PDF:", conditionMessage(e)))
                 })
@@ -2218,9 +2222,14 @@ tryCatch({
         if (length(master_png_files) > 0) {
             message("  -> Combining pages into Master Summary PDF...")
             tryCatch({
-                master_images <- image_read(sort(master_png_files))
-                master_pdf_filename <- here(output_dir, "MESAP_Master_Summary_Report.pdf")
-                image_write(master_images, path = master_pdf_filename, format = "pdf")
+                master_pdf_filename <- file.path(output_dir, "MESAP_Master_Summary_Report.pdf")
+                pdf(master_pdf_filename, width = PLOT_WIDTH, height = PLOT_HEIGHT, onefile = TRUE)
+                for (png_file in sort(master_png_files)) {
+                    img <- png::readPNG(png_file)
+                    grid::grid.newpage()
+                    grid::grid.raster(img)
+                }
+                dev.off()
                 message(paste("  [OK] Created Master Summary:", master_pdf_filename))
             }, error = function(e) {
                 message(paste("  [ERR] Error creating master PDF:", conditionMessage(e)))
