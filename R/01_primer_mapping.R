@@ -37,11 +37,17 @@
 
 # --- Load Libraries & Config ---
 # Suppress startup messages for cleaner log files in HPC environments
-suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tibble))
 suppressPackageStartupMessages(library(Biostrings))
 
 # Load global configuration (paths, constants)
-source(here::here("secat_config.R")) 
+source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_config.R")) 
 
 # Load core utility engines
 source("R/secat_utils.R")     # General utilities

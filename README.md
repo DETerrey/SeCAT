@@ -77,10 +77,19 @@ nextflow run DerbyDT/SeCAT -profile slurm,singularity -params-file params.yaml -
 
 ## Site-specific HPC configuration
 
-The pipeline uses generic resource labels (`mem_16g`, `mem_64g`, etc.).
-To map these to your institution's partition names and account flags,
-copy `conf/custom.config`, fill in your site's settings, and pass it
-with `-c`:
+SeCAT uses generic resource labels so it runs on any SLURM or SGE cluster
+without modification. Whether you need a site config depends on your cluster:
+
+| Situation | What to do |
+|-----------|-----------|
+| Single default queue, no account flag | No config file needed |
+| Multiple partitions (e.g. highmem) | Use `conf/custom.config` |
+| Account/project billing required | Use `conf/custom.config` |
+| JASMIN LOTUS2 | Use `conf/jasmin.config` |
+| SGE cluster | Use `-profile sge,singularity` — no config usually needed |
+
+**For most SLURM clusters**, copy `conf/custom.config`, set your queue name,
+and pass it with `-c`:
 
 ```bash
 nextflow run DerbyDT/SeCAT \
@@ -89,8 +98,24 @@ nextflow run DerbyDT/SeCAT \
     -params-file params.yaml
 ```
 
-A pre-configured file for **JASMIN LOTUS2** is provided at
-`conf/jasmin.config`.
+The config file contains a full list of the resource labels SeCAT uses
+(memory, CPUs, time limits) so you know exactly what each process requests.
+
+**For JASMIN LOTUS2**, a pre-configured file is provided:
+
+```bash
+nextflow run DerbyDT/SeCAT \
+    -profile slurm,singularity \
+    -c conf/jasmin.config \
+    -params-file params.yaml
+```
+
+**If your data is on a non-standard filesystem** (not automounted inside
+Singularity), add a bind mount to your config file:
+
+```
+singularity.runOptions = '--bind /path/to/your/data:/path/to/your/data'
+```
 
 ---
 

@@ -14,14 +14,20 @@ gc(reset = TRUE, full = TRUE)
 # --- Load Libraries & Config ---
 suppressPackageStartupMessages({
   library(Biostrings)
-  library(tidyverse)
+  suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tibble))
 })
 
 # Load config WITHOUT here:: to avoid loading extra packages
-if (file.exists("secat_config.R")) {
-  source("secat_config.R")
+if (file.exists(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_config.R"))) {
+  source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_config.R"))
 } else {
-  source(here::here("secat_config.R"))  # Fallback
+  source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_config.R"))  # Fallback
 }
 
 # Explicit GC after config load

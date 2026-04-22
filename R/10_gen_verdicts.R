@@ -3,7 +3,13 @@
 # PURPOSE: Prepare raw verdict data for interactive selection
 
 suppressPackageStartupMessages({
-  library(tidyverse)
+  suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tibble))
   library(here)
 })
 

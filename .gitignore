@@ -3,3 +3,7 @@
 output/
 simulation_results/
 work/
+R/secat_utils.R.bak_section7
+run_*.log
+*.pid
+secat_manifest_clean.tsv

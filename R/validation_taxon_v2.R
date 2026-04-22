@@ -114,7 +114,13 @@ if (!ok) stop("Missing required packages. Exiting.")
 cat("\n✓ All required packages available\n\n")
 
 suppressPackageStartupMessages({
-  library(tidyverse)
+  suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tibble))
   library(vegan)
   library(irr)
   library(ggplot2)
@@ -137,17 +143,17 @@ if (HAS_MECONETCOMP) suppressPackageStartupMessages(library(meconetcomp))
 # PATHS
 # ==============================================================================
 
-UNTRIMMED_DIR  <- file.path(BASE_DIR, "unaligned_cleaned")
-UNTRIMMED_OTU  <- file.path(UNTRIMMED_DIR, "feature_table.tsv")
-UNTRIMMED_TAX  <- file.path(UNTRIMMED_DIR, "taxonomy.tsv")
-UNTRIMMED_META <- file.path(UNTRIMMED_DIR, "metadata.tsv")
-UNTRIMMED_FA   <- file.path(UNTRIMMED_DIR, "sequences.fasta")   # optional
+PRE_CONSENSUS_DIR  <- file.path(BASE_DIR, "pre_consensus")
+PRE_OTU  <- file.path(PRE_CONSENSUS_DIR, "feature_table.tsv")
+PRE_TAX  <- file.path(PRE_CONSENSUS_DIR, "taxonomy.tsv")
+PRE_META <- file.path(PRE_CONSENSUS_DIR, "metadata.tsv")
+PRE_FA   <- file.path(PRE_CONSENSUS_DIR, "sequences.fasta")   # optional
 
-TRIMMED_DIR    <- file.path(BASE_DIR, "aligned_trimmed")
-TRIMMED_OTU    <- file.path(TRIMMED_DIR, "feature_table.tsv")
-TRIMMED_TAX    <- file.path(TRIMMED_DIR, "taxonomy.tsv")
-TRIMMED_META   <- file.path(TRIMMED_DIR, "metadata.tsv")
-TRIMMED_FA     <- file.path(TRIMMED_DIR, "sequences.fasta")     # optional
+POST_CONSENSUS_DIR <- file.path(BASE_DIR, "post_consensus")
+POST_OTU    <- file.path(POST_CONSENSUS_DIR, "feature_table.tsv")
+POST_TAX    <- file.path(POST_CONSENSUS_DIR, "taxonomy.tsv")
+POST_META   <- file.path(POST_CONSENSUS_DIR, "metadata.tsv")
+POST_FA     <- file.path(POST_CONSENSUS_DIR, "sequences.fasta")     # optional
 
 # SeCAT pipeline outputs for coordinate verification
 CONSENSUS_INFO <- file.path(BASE_DIR, "output/intermediate/consensusregioninfo.csv")
@@ -385,10 +391,10 @@ if (START_TIER == 0) {
   seq_qc_results <- list()
 
   # --- 0A: Length distributions ---
-  if (HAS_BIOSTRINGS && file.exists(UNTRIMMED_FA) && file.exists(TRIMMED_FA)) {
+  if (HAS_BIOSTRINGS && file.exists(PRE_FA) && file.exists(POST_FA)) {
     cat("Tier 0A: Length distributions\n")
-    seqs_before <- Biostrings::readDNAStringSet(UNTRIMMED_FA)
-    seqs_after  <- Biostrings::readDNAStringSet(TRIMMED_FA)
+    seqs_before <- Biostrings::readDNAStringSet(PRE_FA)
+    seqs_after  <- Biostrings::readDNAStringSet(POST_FA)
 
     len_before <- Biostrings::width(seqs_before)
     len_after  <- Biostrings::width(seqs_after)
@@ -522,14 +528,14 @@ if (START_TIER == 0) {
   cat("================================================================================\n\n")
 
   cat("Loading BEFORE data:\n")
-  otu_before <- load_otu_table(UNTRIMMED_OTU)
-  tax_before <- load_taxonomy(UNTRIMMED_TAX)
-  meta_before <- load_metadata(UNTRIMMED_META)
+  otu_before <- load_otu_table(PRE_OTU)
+  tax_before <- load_taxonomy(PRE_TAX)
+  meta_before <- load_metadata(PRE_META)
 
   cat("\nLoading AFTER data:\n")
-  otu_after <- load_otu_table(TRIMMED_OTU)
-  tax_after <- load_taxonomy(TRIMMED_TAX)
-  meta_after <- load_metadata(TRIMMED_META)
+  otu_after <- load_otu_table(POST_OTU)
+  tax_after <- load_taxonomy(POST_TAX)
+  meta_after <- load_metadata(POST_META)
 
   # Align samples
   common_samples <- intersect(colnames(otu_before), colnames(otu_after))

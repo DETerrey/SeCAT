@@ -1,3 +1,4 @@
+
 # ==============================================================================
 # SCRIPT: scripts/00_clean_data.R (v2.2 — ROBUST NUMERIC LOADING)
 # PURPOSE:
@@ -21,14 +22,22 @@
 # ==============================================================================
 
 suppressPackageStartupMessages({
-  library(tidyverse)
+  library(ggplot2)
+  library(dplyr)
+  library(tidyr)
+  library(readr)
+  library(purrr)
+  library(tibble)
+  library(stringr)
+  library(forcats)
   library(Biostrings)
   library(data.table)
-  library(fs)
 })
-
-MANIFEST_IN  <- "secat_manifest.tsv"
-MANIFEST_OUT <- "secat_manifest_clean.tsv"
+# Read paths from environment (Nextflow mode) with fallback for direct invocation
+MANIFEST_IN  <- Sys.getenv("SECAT_MANIFEST",  unset = "secat_manifest.tsv")
+OUTDIR       <- Sys.getenv("SECAT_OUTDIR",     unset = ".")
+MANIFEST_OUT <- file.path(OUTDIR, "cleaned_data", "secat_manifest_clean.tsv")
+dir.create(file.path(OUTDIR, "cleaned_data"), recursive = TRUE, showWarnings = FALSE)
 
 TAXA_TO_REMOVE       <- "Chloroplast|Mitochondria"
 MIN_SAMPLES          <- 3
@@ -223,9 +232,9 @@ load_feature_table <- function(filepath) {
 
 make_clean_path <- function(path) {
   path       <- path[1]
-  parent_dir <- fs::path_dir(path)
-  fname      <- fs::path_file(path)
-  fs::path(parent_dir, "clean", fname)
+  parent_dir <- dirname(path)
+  fname      <- basename(path)
+  file.path(parent_dir, "clean", fname)
 }
 
 # ==============================================================================
@@ -399,10 +408,11 @@ for (i in seq_len(nrow(manifest))) {
   clean_metadata <- make_clean_path(orig_metadata)
   clean_fasta    <- make_clean_path(orig_fasta)
 
-  for (p in unique(c(fs::path_dir(clean_counts), fs::path_dir(clean_taxonomy),
-                     fs::path_dir(clean_metadata), fs::path_dir(clean_fasta)))) {
-    fs::dir_create(p)
-  }
+
+for (p in unique(c(dirname(clean_counts), dirname(clean_taxonomy),
+                   dirname(clean_metadata), dirname(clean_fasta)))) {
+  dir.create(p, recursive = TRUE, showWarnings = FALSE)
+}
 
   # ── [1/4] Metadata ────────────────────────────────────────────────────────
   message("  [1/4] Processing Metadata...")

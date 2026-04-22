@@ -27,7 +27,13 @@
 #   - output/intermediate/simulation_reference_subset.fasta (The ground truth).
 # ==============================================================================
 
-suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tibble))
 suppressPackageStartupMessages(library(here))
 suppressPackageStartupMessages(library(Biostrings))
 
@@ -164,7 +170,7 @@ sample_fasta_reservoir <- function(filepath, n_samples = 100, seed = 123) {
 main <- function() {
     log_and_flush("--- SCRIPT STARTED: prepare_simulation_tasks.R V13 ---")
 
-    source(here::here("secat_config.R"))
+    source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_config.R"))
     log_and_flush(paste("ANALYSIS_MODE detected:", ANALYSIS_MODE))
 
     # Load Configs (with defaults)
@@ -179,7 +185,7 @@ main <- function() {
     # NEW: Get subset size from config
     SUBSET_SIZE <- if(exists("SIMULATION_MAX_SILVA_SUBSET")) SIMULATION_MAX_SILVA_SUBSET else 10000
 
-    manifest <- readr::read_tsv(here::here(SECAT_MANIFEST_PATH), show_col_types = FALSE)
+    manifest <- readr::read_tsv(SECAT_MANIFEST_PATH, show_col_types = FALSE)
     simulation_tasks <- tibble()
 
     # =========================================================
@@ -190,7 +196,7 @@ main <- function() {
     
     if (TRUE) {
         log_and_flush("\n=== GENERATING SILVA SUBSET FOR SIMULATIONS ===")
-        subset_path <- here::here("output/intermediate/simulation_reference_subset.fasta")
+        subset_path <- file.path(OUTDIR, "intermediate/simulation_reference_subset.fasta")
 
         if (!file.exists(subset_path)) {
             log_and_flush(sprintf("  -> Performing Reservoir Sampling (%d seqs) from Reference DB...", SUBSET_SIZE))
@@ -245,7 +251,7 @@ main <- function() {
     # =========================================================
     if (ANALYSIS_MODE == "primer") {
         log_and_flush("\n=== Executing in 'primer' mode. ===")
-        coords_path <- here::here("output/intermediate/primer_coords_phase1_output.csv")
+        coords_path <- file.path(OUTDIR, "intermediate/primer_coords_phase1_output.csv")
         primer_coords <- readr::read_csv(coords_path, show_col_types = FALSE)
         all_primers <- unique(primer_coords$primer_name)
 
@@ -274,7 +280,7 @@ main <- function() {
             tibble(primer_name = curr_primer, max_trim_steps = steps)
         })
 
-        readr::write_csv(primer_steps_table, here::here("output/intermediate/primer_max_trim_steps.csv"))
+        readr::write_csv(primer_steps_table, file.path(OUTDIR, "intermediate/primer_max_trim_steps.csv"))
 
         # Create Task Matrix: Primers x Replicates (Base R Version)
         # FIXED: Replaces dplyr joins with Base R merge/expand.grid to prevent "object not found" errors
@@ -299,7 +305,7 @@ main <- function() {
 
     } else if (ANALYSIS_MODE == "study") {
         log_and_flush("\n=== Executing in 'study' mode. ===")
-        coords_path <- here::here("output/intermediate/study_alignment_coords.csv")
+        coords_path <- file.path(OUTDIR, "intermediate/study_alignment_coords.csv")
         study_coords <- readr::read_csv(coords_path, show_col_types = FALSE)
 
         # Create Task Matrix: Studies x Replicates
@@ -321,7 +327,7 @@ main <- function() {
         log_and_flush("--- Calculating and saving consensus region info ---")
 
         # Load the secat_consensus.R functions
-        source(here::here("R/secat_consensus.R"))
+        source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_consensus.R"))
 
         # Calculate global consensus
         consres <- find_largest_overlapping_clique(
@@ -342,7 +348,7 @@ main <- function() {
         )
 
         # Write to file
-        consensus_path <- here::here("output/intermediate/consensusregioninfo.csv")
+        consensus_path <- file.path(OUTDIR, "intermediate/consensusregioninfo.csv")
         readr::write_csv(consensus_info, consensus_path)
         log_and_flush(sprintf("✓ Saved consensus region info to %s", consensus_path))
 
@@ -360,7 +366,7 @@ main <- function() {
     }
 
     # Save Master Task List (CRITICAL: Must run for BOTH modes)
-    output_path <- here::here("output/intermediate/simulation_tasks.csv")
+    output_path <- file.path(OUTDIR, "intermediate/simulation_tasks.csv")
     readr::write_csv(simulation_tasks, output_path)
     log_and_flush(sprintf("Saved %d simulation tasks to %s", nrow(simulation_tasks), output_path))
     log_and_flush(sprintf("  -> %d unique tasks × %d replicates each",
