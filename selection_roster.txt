@@ -1,0 +1,48 @@
+# ==============================================================================
+# SeCAT Study Selection Roster — Template
+# ==============================================================================
+#
+# PURPOSE:
+#   This file allows you to manually specify which studies to include in the
+#   final merged dataset, bypassing the interactive selection wizard.
+#
+# USAGE:
+#   1. Edit the study list below — one study name per line
+#   2. Study names must exactly match the study_name column in your manifest
+#   3. Set in params.yaml:
+#        selection_mode: "roster"
+#        selection_file: "/path/to/my_selection.txt"
+#
+# SELECTION MODES (set in params.yaml):
+#   auto    — automatically includes all studies with verdict KEEP
+#             (recommended for first runs and automated pipelines)
+#   file    — uses the selection saved by the interactive wizard
+#             (recommended after running Rscript R/11_select_studies.R)
+#   roster  — uses this file
+#             (recommended for reproducible re-runs and batch processing)
+#
+# NOTES:
+#   - Lines beginning with # are comments and are ignored
+#   - Blank lines are ignored
+#   - Study names are case-sensitive
+#   - Studies listed here that failed trimming will be skipped with a warning
+#   - To find valid study names, check:
+#       output/aggregated_data/verdict_data_all_levels.csv
+#     or run:
+#       Rscript R/11_select_studies.R
+#
+# EXAMPLE (remove the # to activate):
+# Beatty_2022
+# Brauer_2022
+# Cucio_2016
+# Ettinger_2017
+# ==============================================================================
+
+# Add your study names below this line, one per line:
+Brauer_2022
+Crump_2018_301bp
+Cucio_2016
+Fahimipour_2017
+Iqbal_2021
+Iqbal_2023
+Sanders_Smith_2020

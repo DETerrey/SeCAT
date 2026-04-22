@@ -7,7 +7,13 @@
 # ==============================================================================
 
 suppressPackageStartupMessages({
-  library(tidyverse)
+  suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tibble))
   library(here)
   library(Biostrings)
   library(data.table)
@@ -16,7 +22,7 @@ suppressPackageStartupMessages({
 cat("\n=== MetaASV DATASET BUILDER ===\n")
 
 # CONFIG
-source(here("secat_config.R"))
+source(here("R/secat_config.R"))
 if (!exists("SECAT_MANIFEST_PATH")) SECAT_MANIFEST_PATH <- "secat_manifest_clean.tsv"
 
 # Print config summary
@@ -25,7 +31,7 @@ cat("  MESAP Pipeline Configuration Summary\n")
 cat("=============================================================\n")
 cat(sprintf("  Reference Database:      %s\n", basename(REFERENCE_DB_PATH)))
 cat(sprintf("  Analysis Mode:           %s\n", ANALYSIS_MODE))
-cat(sprintf("  Align ALL ASVs?          %s\n", USE_ALL_ASVS))          # renamed from USE_ALL_ASVS_FOR_MAFFT
+cat(sprintf("  Align ALL ASVs?          %s\n", USE_ALL_ASVS))
 cat(sprintf("  Changepoint Method:      %s\n", CHANGEPOINT_PENALTY_METHOD))
 cat(sprintf("  Alignment Method:        %s\n", STUDY_ALIGNMENT_METHOD))
 cat(sprintf("  Simulations per primer:  %d\n", NUM_SIMULATIONS_PER_PRIMER))
@@ -39,20 +45,31 @@ cat(sprintf("     PCR bias: %s | Errors: %s | Chimeras: %s\n",
 cat("✓ Config\n\n")
 
 # PATHS
-STD_DIR <- here(OUTPUT_DIR)
-OUTPUT_DIR <- here("output/meta_analysis")
-COMPARISON_DIR <- here("comparison_datasets")
+OUTPUT_DIR <- file.path(OUTDIR, "meta_analysis")
+STD_DIR <- file.path(OUTDIR, "standardized_datasets")
+COMPARISON_DIR <- file.path(OUTDIR, "comparison")
 
 for (d in c(OUTPUT_DIR, COMPARISON_DIR,
-            file.path(COMPARISON_DIR, "aligned_trimmed"),
-            file.path(COMPARISON_DIR, "unaligned_cleaned"))) {
+            file.path(COMPARISON_DIR, "post_consensus"),
+            file.path(COMPARISON_DIR, "pre_consensus"))) {
   dir.create(d, recursive = TRUE, showWarnings = FALSE)
 }
 
 # IDENTIFY SUCCESSFUL STUDIES
-selection_file <- here(AGGREGATED_DATA_DIR, "selected_studies_for_trim.txt")
-selected_studies <- readLines(selection_file)
-manifest <- read_tsv(here(SECAT_MANIFEST_PATH), show_col_types = FALSE)
+SELECTION_MODE <- Sys.getenv("SECAT_SELECTION_MODE", "file")
+if (SELECTION_MODE == "roster") {
+  roster_path <- Sys.getenv("SECAT_SELECTION_FILE", "")
+  if (!file.exists(roster_path)) stop("FATAL: SECAT_SELECTION_FILE not found: ", roster_path)
+  selected_studies <- readLines(roster_path)
+  selected_studies <- selected_studies[!grepl("^#", selected_studies) & nchar(trimws(selected_studies)) > 0]
+  cat(sprintf("Roster-selected %d studies from: %s\n", length(selected_studies), roster_path))
+} else {
+  selection_file <- file.path(AGGREGATED_DATA_DIR, "selected_studies_for_trim.txt")
+  if (!file.exists(selection_file)) stop("FATAL: Selection file not found: ", selection_file)
+  selected_studies <- readLines(selection_file)
+  cat(sprintf("Loaded %d selected studies from file\n", length(selected_studies)))
+}
+manifest <- read_tsv(SECAT_MANIFEST_PATH, show_col_types = FALSE)
 
 trim_summary_file <- file.path(STD_DIR, "trim_summary.csv")
 trim_summary <- read_csv(trim_summary_file, show_col_types = FALSE)
@@ -831,19 +848,19 @@ write_tsv(trimmed_feature_final, file.path(OUTPUT_DIR, "combined_feature_table.t
 write_tsv(trimmed_tax_final, file.path(OUTPUT_DIR, "combined_taxonomy.tsv"))
 
 file.copy(file.path(OUTPUT_DIR, c("combined_feature_table.tsv", "combined_taxonomy.tsv")),
-          file.path(COMPARISON_DIR, "aligned_trimmed/"), overwrite = TRUE)
+          file.path(COMPARISON_DIR, "post_consensus/"), overwrite = TRUE)
 
 write_tsv(untrimmed_feature_final, 
-          file.path(COMPARISON_DIR, "unaligned_cleaned/feature_table.tsv"))
+          file.path(COMPARISON_DIR, "pre_consensus/feature_table.tsv"))
 write_tsv(untrimmed_tax_final, 
-          file.path(COMPARISON_DIR, "unaligned_cleaned/taxonomy.tsv"))
+          file.path(COMPARISON_DIR, "pre_consensus/taxonomy.tsv"))
 
 if (length(all_metadata) > 0) {
   master_metadata <- bind_rows(all_metadata) %>% distinct(SampleID, .keep_all = TRUE)
   write_tsv(master_metadata, file.path(OUTPUT_DIR, "combined_metadata.tsv"))
   file.copy(file.path(OUTPUT_DIR, "combined_metadata.tsv"),
-            c(file.path(COMPARISON_DIR, "aligned_trimmed/metadata.tsv"),
-              file.path(COMPARISON_DIR, "unaligned_cleaned/metadata.tsv")),
+            c(file.path(COMPARISON_DIR, "post_consensus/metadata.tsv"),
+              file.path(COMPARISON_DIR, "pre_consensus/metadata.tsv")),
             overwrite = TRUE)
   
   cat(sprintf("  ✓ Metadata: %d samples\n", nrow(master_metadata)))
@@ -878,7 +895,7 @@ cat(sprintf("    Trimmed (merged):    %s reads (%.2f%%)\n",
 cat(sprintf("    Untrimmed (merged):  %s reads\n", format(untrimmed_total_reads, big.mark = ",")))
 
 cat("\nOutputs:\n")
-cat(sprintf("  - Trimmed (aligned):   %s\n", file.path(COMPARISON_DIR, "aligned_trimmed/")))
-cat(sprintf("  - Untrimmed (cleaned): %s\n", file.path(COMPARISON_DIR, "unaligned_cleaned/")))
+cat(sprintf("  - Post-consensus (trimmed):   %s\n", file.path(COMPARISON_DIR, "post_consensus/")))
+cat(sprintf("  - Pre-consensus (original): %s\n", file.path(COMPARISON_DIR, "pre_consensus/")))
 cat(sprintf("  - Combined outputs:    %s\n", OUTPUT_DIR))
 cat("================================================================================\n")

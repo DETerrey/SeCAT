@@ -1,6 +1,6 @@
 process GENERATE_REPORT {
     tag "generating PDF report"
-    label 'mem_16g_cpu4'
+    label 'mem_64g_cpu4'
     publishDir "${params.outdir}/reports",     mode: 'copy', pattern: "*.pdf"
     publishDir "${params.outdir}/final_plots", mode: 'copy', pattern: "final_plots/**"
 
@@ -26,11 +26,11 @@ process GENERATE_REPORT {
         cp \$f output/real_data_results/
     done
 
-    # Link intermediate files needed for alignment plot
-    ln -s ${params.outdir}/intermediate/study_alignment_coords.csv \
-          output/intermediate/study_alignment_coords.csv 2>/dev/null || true
-    ln -s ${params.outdir}/intermediate/consensusregioninfo.csv \
-          output/intermediate/consensusregioninfo.csv 2>/dev/null || true
+    # Copy intermediate files needed for alignment plot
+    cp ${params.outdir}/intermediate/study_alignment_coords.csv \
+       output/intermediate/study_alignment_coords.csv 2>/dev/null || true
+    cp ${params.outdir}/intermediate/consensusregioninfo.csv \
+       output/intermediate/consensusregioninfo.csv 2>/dev/null || true
 
     export SECAT_MANIFEST="${params.manifest}"
     export SECAT_ANALYSIS_MODE="${params.analysis_mode}"

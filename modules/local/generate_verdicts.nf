@@ -1,5 +1,6 @@
 process GENERATE_VERDICTS {
     tag "generating verdicts"
+    cache 'lenient'
     label 'mem_4g'
     publishDir "${params.outdir}/aggregated_data", mode: 'copy'
 

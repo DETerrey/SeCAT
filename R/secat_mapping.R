@@ -205,7 +205,7 @@ map_study_to_reference <- function(study_info, reference_db_path, config) {
 
   # 3. ASV Subsampling Logic
   # Aligning millions of ASVs is slow; a random subset defines the window accurately.
-  if (config$USE_ALL_ASVS_FOR_MAFFT) {
+  if (config$USE_ALL_ASVS) {
      message("  - Using ALL ASVs for alignment (High Compute Mode).")
   } else {
      sample_size <- min(config$ASV_SAMPLE_SIZE, length(asv_sequences))

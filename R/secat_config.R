@@ -8,6 +8,7 @@
 # R scripts need modification.
 # =============================================================================
 
+
 .secat_env <- function(var, default, type = "character") {
   val <- Sys.getenv(var, unset = NA_character_)
   if (is.na(val) || val == "") {
@@ -74,7 +75,7 @@ MIN_CONSENSUS_STUDIES            <- .secat_env("SECAT_MIN_CONSENSUS_STUDIES",   
 MIN_CONSENSUS_COVERAGE           <- .secat_env("SECAT_MIN_CONSENSUS_COVERAGE",   0.50, "numeric")
 ANALYSIS_MODE                 <- .secat_env("SECAT_ANALYSIS_MODE",           "study")
 STUDY_ALIGNMENT_METHOD        <- .secat_env("SECAT_ALIGNMENT_METHOD",        "modal")
-USE_ALL_ASVS_FOR_MAFFT        <- .secat_env("SECAT_USE_ALL_ASVS",           TRUE,  "logical")
+USE_ALL_ASVS                  <- .secat_env("SECAT_USE_ALL_ASVS",           TRUE,  "logical")
 ASV_SAMPLE_SIZE               <- .secat_env("SECAT_ASV_SAMPLE_SIZE",        500,   "integer")
 MAX_PRIMER_MISMATCH           <- .secat_env("SECAT_MAX_PRIMER_MISMATCH",    4,     "integer")
 SIMULATION_ABUNDANCE_MODEL    <- .secat_env("SECAT_SIM_ABUNDANCE_MODEL",    "lognormal")

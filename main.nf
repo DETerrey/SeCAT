@@ -15,6 +15,7 @@ include { ANALYSE_REAL        } from './modules/local/analyse_real'
 include { AGGREGATE           } from './modules/local/aggregate'
 include { GENERATE_VERDICTS   } from './modules/local/generate_verdicts'
 include { GENERATE_REPORT     } from './modules/local/generate_report'
+include { TRIM_SEQUENCES    } from './modules/local/trim_sequences'
 include { MERGE_DATASETS      } from './modules/local/merge_datasets'
 include { VALIDATE            } from './modules/local/validate'
 include { PRIMER_MAPPING      } from './modules/local/primer_mapping'
@@ -143,13 +144,17 @@ workflow {
         clean_manifest
     )
 
+    indexed_studies_with_aln_ch = indexed_studies_ch
+        .map { task_id, study_name, row -> tuple(study_name, task_id, row) }   // study_name first for .join
+        .join(STUDY_MAPPING.out.aligned_fasta, failOnMismatch: true, failOnDuplicate: true)
+        .map { study_name, task_id, row, aln -> tuple(task_id, study_name, row, aln) }  // restore original order + add aln
+
     ANALYSE_REAL(
-        indexed_studies_ch,
+        indexed_studies_with_aln_ch,
         collected_coords,
         PREPARE_SIMS.out.consensus_info.first(),
         clean_manifest
     )
-
     sim_tasks_ch = PREPARE_SIMS.out.sim_tasks_csv.first()
         .splitCsv(header: true)
         .map { row ->
@@ -175,10 +180,10 @@ workflow {
 
     GENERATE_VERDICTS(AGGREGATE.out.master_verdict_table)
 
-    GENERATE_REPORT(
-        AGGREGATE.out.aggregated_dir,
-        GENERATE_VERDICTS.out.verdict_data
-    )
+GENERATE_REPORT(
+    AGGREGATE.out.aggregated_dir,
+    GENERATE_VERDICTS.out.verdict_data,
+    ANALYSE_REAL.out.results_rds.collect()   // stages all 11 RDS files flat into work dir
     )
 
     if (params.auto_trim) {
@@ -192,14 +197,18 @@ workflow {
         MERGE_DATASETS(
             TRIM_SEQUENCES.out.standardized_fastas.collect(),
             TRIM_SEQUENCES.out.trim_summary,
-            manifest_rows_ch.collect()
+            manifest_rows_ch.collect(),
+            GENERATE_VERDICTS.out.verdict_data
         )
         if (params.run_validation) {
             VALIDATE(
-                MERGE_DATASETS.out.combined_fasta,
-                MERGE_DATASETS.out.combined_otu,
-                MERGE_DATASETS.out.combined_tax,
-                MERGE_DATASETS.out.combined_meta.ifEmpty(file('NO_META')),
+                MERGE_DATASETS.out.post_otu,
+                MERGE_DATASETS.out.post_tax,
+                MERGE_DATASETS.out.post_meta.ifEmpty(file('NO_META')),
+                MERGE_DATASETS.out.post_fasta.ifEmpty(file('NO_FASTA')),
+                MERGE_DATASETS.out.pre_otu,
+                MERGE_DATASETS.out.pre_tax,
+                MERGE_DATASETS.out.pre_meta.ifEmpty(file('NO_META')),
                 MERGE_DATASETS.out.asv_mapping.ifEmpty(file('NO_MAPPING')),
                 AGGREGATE.out.aggregated_dir
             )
@@ -217,8 +226,7 @@ workflow {
 
 workflow STANDARDIZE {
 
-    selected_file  = file("${params.outdir}/aggregated_data/selected_studies_for_trim.txt",
-                          checkIfExists: true)
+    selected_file  = file(params.selection_file, checkIfExists: true)
     consensus_info = file("${params.outdir}/intermediate/consensusregioninfo.csv",
                           checkIfExists: true)
     study_coords   = file("${params.outdir}/intermediate/study_alignment_coords.csv",
@@ -229,34 +237,29 @@ workflow STANDARDIZE {
     manifest_lines  = manifest_file.readLines()
     manifest_headers = manifest_lines[0].split('\t') as List
 
-    manifest_rows_ch = Channel.from(
-        manifest_lines[1..-1].collect { line ->
-            def values = line.split('\t') as List
-            def row = [manifest_headers, values].transpose()
-                          .collectEntries { k, v -> [(k): v] }
-            tuple(row.study_name, row)
-        }
-    )
-
     TRIM_SEQUENCES(
         selected_file,
         study_coords,
         consensus_info,
-        manifest_rows_ch.collect()
+        manifest_file
     )
 
     MERGE_DATASETS(
         TRIM_SEQUENCES.out.standardized_fastas.collect(),
         TRIM_SEQUENCES.out.trim_summary,
-        manifest_rows_ch.collect()
+        manifest_file,
+        selected_file
     )
 
     if (params.run_validation) {
         VALIDATE(
-            MERGE_DATASETS.out.combined_fasta,
-            MERGE_DATASETS.out.combined_otu,
-            MERGE_DATASETS.out.combined_tax,
-            MERGE_DATASETS.out.combined_meta.ifEmpty(file('NO_META')),
+            MERGE_DATASETS.out.post_otu,
+            MERGE_DATASETS.out.post_tax,
+            MERGE_DATASETS.out.post_meta.ifEmpty(file('NO_META')),
+            MERGE_DATASETS.out.post_fasta.ifEmpty(file('NO_FASTA')),
+            MERGE_DATASETS.out.pre_otu,
+            MERGE_DATASETS.out.pre_tax,
+            MERGE_DATASETS.out.pre_meta.ifEmpty(file('NO_META')),
             MERGE_DATASETS.out.asv_mapping.ifEmpty(file('NO_MAPPING')),
             aggregated_dir
         )

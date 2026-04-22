@@ -1,50 +1,85 @@
 #!/usr/bin/env Rscript
-# scripts/12_trim_sequences.R
-# PURPOSE: Extracts consensus region from ALIGNED sequences
+# ==============================================================================
+# 12_trim_sequences.R — SeCAT v4.1
+# Extracts consensus region from aligned sequences.
+# All paths read from environment variables set by Nextflow (trim_sequences.nf)
+# or from secat_config.R defaults. No here() calls.
+# ==============================================================================
 
 suppressPackageStartupMessages({
-  library(tidyverse)
-  library(here)
+  library(dplyr)
+  library(tidyr)
+  library(readr)
+  library(stringr)
+  library(purrr)
+  library(tibble)
   library(Biostrings)
 })
 
-# --- LOAD CONFIG ---
 cat("\n=== STARTING STANDARDIZATION (From Aligned Sequences) ===\n")
-cat("Loading configuration...\n")
 
-config_file <- here("secat_config.R")
+# --- LOAD CONFIG via env vars ---
+PROJECTDIR <- Sys.getenv("SECAT_PROJECTDIR", getwd())
+config_file <- file.path(PROJECTDIR, "R", "secat_config.R")
 if (file.exists(config_file)) {
   source(config_file)
-  cat(sprintf("  ✓ Config loaded: MIN_REQUIRED_LENGTH = %d bp\n", MIN_REQUIRED_LENGTH))
+  cat(sprintf("  ✓ Config loaded from: %s\n", config_file))
 } else {
   cat("  ⚠️ Config file not found, using defaults\n")
   MIN_REQUIRED_LENGTH <- 50
-  OUTPUT_DIR <- "output/standardized_datasets"
-  ALIGNED_DIR <- "output/intermediate/aligned_fastas"
+  OUTDIR <- "."
 }
 
-# Minimum fraction of sequences that must survive the length filter.
-# Studies falling below this are flagged as FAIL_LOW_YIELD and skipped.
-# Ettinger-type failures (0.07% yield) are caught here before the sprintf crash.
-if (!exists("MIN_YIELD_RATE")) MIN_YIELD_RATE <- 0.50
+# Path overrides from env vars (set by Nextflow module)
+OUTDIR      <- Sys.getenv("SECAT_OUTDIR", OUTDIR)
+OUTPUT_DIR  <- file.path(OUTDIR, "standardized_datasets")
+ALIGNED_DIR <- file.path(OUTDIR, "intermediate", "aligned_fastas")
 
-# Ensure directories exist
-if (!dir.exists(OUTPUT_DIR)) dir.create(OUTPUT_DIR, recursive = TRUE)
+if (!exists("MIN_REQUIRED_LENGTH")) MIN_REQUIRED_LENGTH <- 50
+if (!exists("MIN_YIELD_RATE"))      MIN_YIELD_RATE      <- 0.50
+
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+
+cat(sprintf("  OUTDIR:      %s\n", OUTDIR))
+cat(sprintf("  OUTPUT_DIR:  %s\n", OUTPUT_DIR))
+cat(sprintf("  ALIGNED_DIR: %s\n", ALIGNED_DIR))
 
 # --- 1. Load Inputs ---
-selection_file <- here("output/aggregated_data/selected_studies_for_trim.txt")
-if (!file.exists(selection_file)) stop("FATAL: Selection file not found.")
-selected_studies <- readLines(selection_file)
+# --- 1. Load Inputs ---
+selection_file <- file.path(OUTDIR, "aggregated_data", "selected_studies_for_trim.txt")
+SELECTION_MODE <- Sys.getenv("SECAT_SELECTION_MODE", "file")
+
+if (SELECTION_MODE == "auto") {
+  verdict_file <- file.path(OUTDIR, "aggregated_data", "verdict_data_all_levels.csv")
+  if (!file.exists(verdict_file)) stop("FATAL: verdict_data_all_levels.csv not found for auto-selection: ", verdict_file)
+  verdicts         <- read_csv(verdict_file, show_col_types = FALSE)
+  selected_studies <- verdicts %>%
+    filter(Final_Verdict == "KEEP") %>%
+    pull(Study) %>%
+    unique()
+  cat(sprintf("Auto-selected %d KEEP studies\n", length(selected_studies)))
+
+} else if (SELECTION_MODE == "roster") {
+  roster_path <- Sys.getenv("SECAT_SELECTION_FILE", "")
+  if (!file.exists(roster_path)) stop("FATAL: SECAT_SELECTION_FILE not found: ", roster_path)
+  selected_studies <- readLines(roster_path)
+  selected_studies <- selected_studies[!grepl("^#", selected_studies) & nchar(trimws(selected_studies)) > 0]
+  cat(sprintf("Roster-selected %d studies from: %s\n", length(selected_studies), roster_path))
+
+} else {
+  if (!file.exists(selection_file)) stop("FATAL: Selection file not found: ", selection_file)
+  selected_studies <- readLines(selection_file)
+  cat(sprintf("Loaded %d selected studies from file\n", length(selected_studies)))
+}
+
 cat(sprintf("Targeting %d selected studies...\n", length(selected_studies)))
 
-# Load study coordinates
-coords_file <- here("output/intermediate/study_alignment_coords.csv")
-if (!file.exists(coords_file)) stop("FATAL: Coordinates file not found.")
+coords_file <- file.path(OUTDIR, "intermediate", "study_alignment_coords.csv")
+if (!file.exists(coords_file)) stop("FATAL: Coordinates file not found: ", coords_file)
 coords <- read_csv(coords_file, show_col_types = FALSE)
 
-# Load consensus region
-consensus_file <- here("output/intermediate/consensusregioninfo.csv")
-if (!file.exists(consensus_file)) stop("FATAL: Consensus region file not found.")
+consensus_file <- file.path(OUTDIR, "intermediate", "consensusregioninfo.csv")
+if (!file.exists(consensus_file)) stop("FATAL: Consensus region file not found: ", consensus_file)
 consensus_info <- read_csv(consensus_file, show_col_types = FALSE)
 
 consensus_start <- consensus_info$ConsensusStart[1]
@@ -59,11 +94,11 @@ cat(sprintf("Global Consensus Target: %d - %d (Length: %d bp)\n\n",
 
 # --- 2. Process Each Study ---
 trim_summary <- tibble(
-  study_name         = character(),
-  status             = character(),
-  original_seqs      = integer(),
-  trimmed_seqs       = integer(),
-  aligned_length     = integer(),
+  study_name          = character(),
+  status              = character(),
+  original_seqs       = integer(),
+  trimmed_seqs        = integer(),
+  aligned_length      = integer(),
   degapped_length_min = integer(),
   degapped_length_max = integer()
 )
@@ -71,19 +106,16 @@ trim_summary <- tibble(
 for (study in selected_studies) {
   cat(sprintf("Processing: %s\n", study))
 
-  # Get study coordinates
   study_coords <- coords %>% filter(study_name == !!study)
   if (nrow(study_coords) == 0) {
     cat("  [SKIP] No coordinates found.\n\n")
     next
   }
 
-  # Look for aligned FASTA
   aligned_fasta <- file.path(ALIGNED_DIR, paste0(study, "_aligned.fasta"))
 
   if (!file.exists(aligned_fasta)) {
-    cat(sprintf("  [FAIL] Aligned FASTA not found: %s\n", aligned_fasta))
-    cat("  -> You need to run Phase 2 (alignment) first!\n\n")
+    cat(sprintf("  [FAIL] Aligned FASTA not found: %s\n\n", aligned_fasta))
     trim_summary <- bind_rows(trim_summary, tibble(
       study_name = study, status = "FAIL_NO_ALIGNMENT",
       original_seqs = NA_integer_, trimmed_seqs = 0L,
@@ -93,9 +125,8 @@ for (study in selected_studies) {
     next
   }
 
-  # Load ALIGNED sequences (~43k positions wide)
-  aligned_seqs    <- readDNAStringSet(aligned_fasta)
-  original_count  <- length(aligned_seqs)
+  aligned_seqs   <- readDNAStringSet(aligned_fasta)
+  original_count <- length(aligned_seqs)
   cat(sprintf("  -> Loaded %d aligned sequences\n", original_count))
 
   alignment_widths <- unique(width(aligned_seqs))
@@ -107,7 +138,6 @@ for (study in selected_studies) {
   cat(sprintf("  -> Study maps to SILVA: %d - %d\n", study_ref_start, study_ref_end))
   cat(sprintf("  -> Consensus region:     %d - %d\n", consensus_start, consensus_end))
 
-  # Check geometric overlap
   if (study_ref_end < consensus_start || study_ref_start > consensus_end) {
     cat("  [FAIL] Study does not overlap consensus region.\n\n")
     trim_summary <- bind_rows(trim_summary, tibble(
@@ -119,15 +149,12 @@ for (study in selected_studies) {
     next
   }
 
-  # Calculate effective overlap
   effective_start <- max(consensus_start, study_ref_start)
   effective_end   <- min(consensus_end,   study_ref_end)
   aligned_len     <- effective_end - effective_start + 1L
 
-  cat(sprintf("  -> Effective overlap:    %d - %d\n", effective_start, effective_end))
   cat(sprintf("  -> Extracting alignment columns: %d - %d\n", effective_start, effective_end))
 
-  # Extract consensus region (keeping gaps) then degap
   trimmed_aligned  <- subseq(aligned_seqs, start = effective_start, end = effective_end)
   trimmed_degapped <- DNAStringSet(gsub("-", "", as.character(trimmed_aligned)))
 
@@ -136,22 +163,13 @@ for (study in selected_studies) {
   max_len <- max(degapped_lengths)
   cat(sprintf("  -> Degapped length range: %d - %d bp\n", min_len, max_len))
 
-  # Apply minimum length filter
-  cat(sprintf("  -> Applying minimum length filter: %d bp\n", MIN_REQUIRED_LENGTH))
   valid_seqs    <- trimmed_degapped[degapped_lengths >= MIN_REQUIRED_LENGTH]
   dropped_count <- original_count - length(valid_seqs)
-
   if (dropped_count > 0) {
     cat(sprintf("  -> Dropped %d sequences (< %d bp after degapping)\n",
                 dropped_count, MIN_REQUIRED_LENGTH))
-    dropped_lengths <- degapped_lengths[degapped_lengths < MIN_REQUIRED_LENGTH]
-    if (length(dropped_lengths) > 0) {
-      cat(sprintf("     Dropped length range: %d - %d bp (median: %.0f bp)\n",
-                  min(dropped_lengths), max(dropped_lengths), median(dropped_lengths)))
-    }
   }
 
-  # --- All sequences too short ---
   if (length(valid_seqs) == 0L) {
     cat("  [FAIL] All sequences too short after trimming.\n\n")
     trim_summary <- bind_rows(trim_summary, tibble(
@@ -163,16 +181,10 @@ for (study in selected_studies) {
     next
   }
 
-  # --- Low-yield check ---
-  # Catches studies whose sequences do not genuinely cover the consensus
-  # region (e.g. Ettinger_2017: only 12/17675 = 0.07% survived).
-  # These pass the geometric overlap test but are biologically unusable.
   yield_rate <- length(valid_seqs) / original_count
   if (yield_rate < MIN_YIELD_RATE) {
-    cat(sprintf("  [FAIL] Only %.1f%% of sequences passed length filter (minimum: %.0f%%).\n",
+    cat(sprintf("  [FAIL] Only %.1f%% of sequences passed length filter (minimum: %.0f%%).\n\n",
                 100 * yield_rate, 100 * MIN_YIELD_RATE))
-    cat("         Sequences do not adequately cover the consensus region.\n")
-    cat("         This study will be excluded from the merged dataset.\n\n")
     trim_summary <- bind_rows(trim_summary, tibble(
       study_name = study, status = "FAIL_LOW_YIELD",
       original_seqs = original_count, trimmed_seqs = length(valid_seqs),
@@ -183,15 +195,12 @@ for (study in selected_studies) {
     next
   }
 
-  # --- Save output ---
   output_fasta <- file.path(OUTPUT_DIR, paste0(study, "_standardized.fasta"))
   writeXStringSet(valid_seqs, output_fasta, width = 80)
 
   final_lengths <- width(valid_seqs)
   cat(sprintf("  [OK] Saved %d sequences (yield: %.1f%%)\n",
               length(valid_seqs), 100 * yield_rate))
-  cat(sprintf("  -> Length range: %d - %d bp (median: %.0f bp)\n",
-              min(final_lengths), max(final_lengths), median(final_lengths)))
   cat(sprintf("  -> Output: %s\n\n", output_fasta))
 
   trim_summary <- bind_rows(trim_summary, tibble(
@@ -214,29 +223,21 @@ cat("                        TRIMMING SUMMARY\n")
 cat("================================================================================\n\n")
 print(trim_summary, n = Inf)
 
-n_success  <- sum(trim_summary$status == "SUCCESS",        na.rm = TRUE)
-n_low_yield <- sum(trim_summary$status == "FAIL_LOW_YIELD", na.rm = TRUE)
-n_failed   <- sum(startsWith(trim_summary$status, "FAIL"), na.rm = TRUE) - n_low_yield
+n_success   <- sum(trim_summary$status == "SUCCESS",         na.rm = TRUE)
+n_low_yield <- sum(trim_summary$status == "FAIL_LOW_YIELD",  na.rm = TRUE)
+n_failed    <- sum(startsWith(trim_summary$status, "FAIL"),  na.rm = TRUE) - n_low_yield
 
-cat(sprintf("\n✓ Successfully trimmed : %d / %d studies\n", n_success, length(selected_studies)))
+cat(sprintf("\n✓ Successfully trimmed : %d / %d studies\n",
+            n_success, length(selected_studies)))
 if (n_low_yield > 0) {
   low_yield_studies <- trim_summary$study_name[trim_summary$status == "FAIL_LOW_YIELD"]
-  cat(sprintf("⚠ Low yield (excluded): %d study/studies — %s\n",
+  cat(sprintf("⚠ Low yield (excluded): %d — %s\n",
               n_low_yield, paste(low_yield_studies, collapse = ", ")))
-  cat("  These studies map geometrically to the consensus region but their\n")
-  cat("  sequences have insufficient coverage at those alignment positions.\n")
-  cat("  Review aligned FASTAs and consider excluding from future runs.\n")
 }
 if (n_failed > 0) {
-  cat(sprintf("✗ Other failures       : %d study/studies\n", n_failed))
-}
-
-# --- 5. Launch Merger ---
-if (n_success > 0) {
-  cat("\n--- Launching Merger... ---\n")
-  system("Rscript scripts/13_merge_datasets.R")
-} else {
-  cat("\n❌ No studies were successfully trimmed. Skipping merge.\n")
+  cat(sprintf("✗ Other failures       : %d\n", n_failed))
 }
 
 cat("\n=== STANDARDIZATION COMPLETE ===\n")
+# NOTE: Merger is called as a separate Nextflow process (MERGE_DATASETS),
+# not via system() from this script.
