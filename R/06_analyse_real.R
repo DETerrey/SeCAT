@@ -11,12 +11,18 @@
 
 cat("--- Loading Libraries & Helper Functions ---\n")
 suppressPackageStartupMessages({
-    library(tidyverse)
+    suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(purrr))
+suppressPackageStartupMessages(library(tibble))
     library(here)
     library(Biostrings)
 })
 
-source(here::here("secat_config.R"))
+source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_config.R"))
 
 # Standardize step mode (Global setting)
 current_step_mode <- if(exists("TRIM_STEP_MODE")) TRIM_STEP_MODE else "absolute"
@@ -28,16 +34,33 @@ if (!current_step_mode %in% c("scaled", "absolute")) {
 }
 
 # Load core engines
-source(here::here("R/secat_utils.R"))
+source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_utils.R"))
 
-# --- Get Task ID ---
-TASK_ID <- as.integer(Sys.getenv("SGE_TASK_ID", unset = "1"))
-if (is.na(TASK_ID)) stop("FATAL: SGE_TASK_ID invalid.")
+# --- Get Task ID / Study Name ---
+# Fetch arguments explicitly passed from the Nextflow command line
+args <- commandArgs(trailingOnly = TRUE)
+
+# Safety check: ensure Nextflow actually passed an argument
+if (length(args) < 1) {
+  stop("FATAL: Requires 'study_name' as a command-line argument.")
+}
+
+# The first argument passed will be our target study
+target_study <- args[1]
 
 cat("--- Loading Data ---\n")
 # Load manifest to identify the study
-manifest <- readr::read_tsv(here::here(SECAT_MANIFEST_PATH), show_col_types = FALSE)
-job_info <- manifest[TASK_ID, ]
+manifest <- readr::read_tsv(SECAT_MANIFEST_PATH, show_col_types = FALSE)
+
+# Filter the manifest to find the row matching our target study
+job_info <- subset(manifest, study_name == target_study)
+
+# Safety check: ensure we found exactly one matching study
+if (nrow(job_info) != 1) {
+  stop(paste("FATAL: Could not find exactly one entry for study:", target_study))
+}
+
+# Extract the variables exactly as before
 study_name <- job_info$study_name
 primer_name_from_manifest <- job_info$primer_name
 cat(paste("Processing study:", study_name, "| Primer set:", primer_name_from_manifest, "\n"))
@@ -72,13 +95,13 @@ consensus_end_global <- NULL
 USE_ALIGNMENT_LOGIC <- (ANALYSIS_MODE == "study")
 
 # Load the clique consensus function
-source(here::here("R", "secat_consensus.R"))
+source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R", "secat_consensus.R"))
 
 if (ANALYSIS_MODE == "primer") {
     # ---------------------------------------------------------
     # PRIMER MODE: Theoretical Clique Consensus
     # ---------------------------------------------------------
-    coords_path <- here::here("output/intermediate/primer_coords_phase1_output.csv")
+    coords_path <- file.path("output/intermediate/primer_coords_phase1_output.csv")
     if (!file.exists(coords_path)) stop("[FATAL] primer_coords_phase1_output.csv not found.")
 
     # 1. Load Primer Database (Dictionary of Primer Name -> Coords)
@@ -127,7 +150,7 @@ if (ANALYSIS_MODE == "primer") {
     # STUDY MODE: Empirical Clique Consensus (Existing Logic)
     # ---------------------------------------------------------
     cat("   -> In study mode. Calculating global consensus from empirical alignments.\n")
-    coords_path <- here::here("output/intermediate/study_alignment_coords.csv")
+    coords_path <- file.path("output/intermediate/study_alignment_coords.csv")
 
     if (!file.exists(coords_path)) stop("[FATAL] study_alignment_coords.csv not found.")
 
@@ -181,7 +204,7 @@ aligned_seqs_for_run <- NULL
 
 if (USE_ALIGNMENT_LOGIC) {
     # Alignment object generated in Phase 2
-    align_path <- here::here("output", "intermediate", "aligned_fastas", paste0(study_name, "_aligned.fasta"))
+    align_path <- file.path("output", "intermediate", "aligned_fastas", paste0(study_name, "_aligned.fasta"))
     if (file.exists(align_path)) {
         cat("  -> Loading alignment object from Step 02...\n")
         aligned_seqs_for_run <- Biostrings::readDNAStringSet(align_path)

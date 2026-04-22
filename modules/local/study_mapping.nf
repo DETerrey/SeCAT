@@ -13,8 +13,8 @@ process STUDY_MAPPING {
     output:
     path "mapping_part_${task_id}.csv",  emit: mapping_part
     path "${study_name}_coords.csv",     emit: asv_coords,    optional: true
-    path "${study_name}_aligned.fasta",  emit: aligned_fasta, optional: true
-
+    tuple val(study_name), path("${study_name}_aligned.fasta"),  emit: aligned_fasta
+    
     script:
     def absOutdir = params.outdir.startsWith('/') ? params.outdir : "${projectDir}/${params.outdir}"
     """
@@ -24,7 +24,7 @@ process STUDY_MAPPING {
     export SECAT_ANALYSIS_MODE="${params.analysis_mode}"
     export SECAT_ALIGNMENT_MODE="${params.reference_alignment_mode}"
     export SECAT_SUBSET_SIZE="${params.reference_subset_size}"
-    export SECAT_USE_ALL_ASVS="${params.use_all_asvs_for_mafft}"
+    export SECAT_USE_ALL_ASVS="${params.use_all_asvs}"
     export SECAT_VSEARCH_PATH="vsearch"
     export SECAT_ALIGNMENT_METHOD="${params.study_alignment_method}"
     export SECAT_OUTDIR="${absOutdir}"
@@ -34,6 +34,6 @@ process STUDY_MAPPING {
     # Symlink outputs into work directory for Nextflow to stage
     ln -sf ${absOutdir}/intermediate/study_mapping_parts/mapping_part_${task_id}.csv ./mapping_part_${task_id}.csv || true
     ln -sf ${absOutdir}/intermediate/asv_coordinates/${study_name}_coords.csv ./${study_name}_coords.csv || true
-    ln -sf ${absOutdir}/intermediate/aligned_fastas/${study_name}_aligned.fasta ./${study_name}_aligned.fasta || true
+    ln -sf ${absOutdir}/intermediate/aligned_fastas/${study_name}_aligned.fasta ./${study_name}_aligned.fasta
     """
 }

@@ -4,10 +4,10 @@ process ANALYSE_REAL {
     publishDir "${params.outdir}/real_data_results/${study_name}", mode: 'copy', pattern: "*_results.rds"
 
     input:
-    tuple val(task_id), val(study_name), val(manifest_row)
-    path study_coords
-    path consensus_info
-    path clean_manifest
+        tuple val(task_id), val(study_name), val(manifest_row), path(aligned_fasta)
+        path study_coords
+        path consensus_info
+        path clean_manifest
 
     output:
     path "${study_name}_results.rds", emit: results_rds
@@ -34,11 +34,12 @@ process ANALYSE_REAL {
     export SECAT_DISTANCE_CUTOFF="${params.distance_cutoff_threshold}"
     export SECAT_DISTANCE_CUTOFF_MIN_BP="${params.distance_cutoff_min_trim_bp}"
     export SECAT_OUTDIR="."
-    mkdir -p output/intermediate output/real_data_results/${study_name}
+    mkdir -p output/intermediate/aligned_fastas output/real_data_results/${study_name}
     cp ${study_coords}   output/intermediate/study_alignment_coords.csv 2>/dev/null || true
     cp ${consensus_info} output/intermediate/consensusregioninfo.csv    2>/dev/null || true
+    cp ${aligned_fasta}  output/intermediate/aligned_fastas/${study_name}_aligned.fasta
     export SECAT_PROJECTDIR="${projectDir}"
-    Rscript ${projectDir}/R/06_analyse_real.R
+    Rscript ${projectDir}/R/06_analyse_real.R "${study_name}"
     mv output/real_data_results/${study_name}/${study_name}_results.rds ./${study_name}_results.rds
     """
 }

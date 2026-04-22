@@ -1,5 +1,6 @@
 process PREPARE_SIMS {
     tag "preparing simulation tasks"
+    cache 'lenient'
     label 'mem_4g'
     publishDir "${params.outdir}/intermediate", mode: 'copy'
 
@@ -23,6 +24,7 @@ process PREPARE_SIMS {
     export SECAT_SIM_MAX_SILVA_SUBSET="${params.sim_max_silva_subset}"
     export SECAT_SIM_USE_PREBUILT="${params.sim_use_prebuilt_subset}"
     export SECAT_TRIM_STEP_MODE="${params.trim_step_mode}"
+    export SECAT_TRIM_INCREMENT="${params.trim_increment}"
     export SECAT_DEFAULT_MAX_TRIM_STEPS="${params.default_max_trim_steps}"
     export SECAT_CONSENSUS_BUFFER_STEPS="${params.consensus_buffer_steps}"
     export SECAT_CONSENSUS_OPT_THRESHOLD="${params.consensus_optimization_threshold}"

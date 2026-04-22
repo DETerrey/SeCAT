@@ -1,5 +1,6 @@
 process RUN_SIMULATION {
     tag "${task_id}__seed_${seed}"
+    cache 'lenient'
     label 'mem_18g'
     publishDir "${params.outdir}/simulation_results/${task_id}/seed_${seed}", mode: 'copy', pattern: "results.rds"
 
@@ -19,6 +20,7 @@ process RUN_SIMULATION {
     export SECAT_ANALYSIS_MODE="${params.analysis_mode}"
     export SECAT_VSEARCH_PATH="vsearch"  # binary is on PATH inside container
     export SECAT_TRIM_STEP_MODE="${params.trim_step_mode}"
+    export SECAT_TRIM_INCREMENT="${params.trim_increment}"
     export SECAT_DEFAULT_MAX_TRIM_STEPS="${params.default_max_trim_steps}"
     export SECAT_CONSENSUS_BUFFER_STEPS="${params.consensus_buffer_steps}"
     export SECAT_SIM_ABUNDANCE_MODEL="${params.sim_abundance_model}"

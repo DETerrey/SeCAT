@@ -12,8 +12,8 @@
 # ============================================================================
 
 # ── Required ─────────────────────────────────────────────────────────────────
-manifest:     "secat_manifest.tsv"
-reference_db: "/path/to/SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta"
+manifest:     "/home/users/dterrey/secat_data/secat_manifest_jasmin.tsv"
+reference_db: "/home/users/dterrey/secat_data/references/SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta"
 
 # ── Output ────────────────────────────────────────────────────────────────────
 outdir: "output"
@@ -40,8 +40,8 @@ sim_add_chimeras:        false
 sim_chimera_rate:        0.02
 
 # ── Trimming ──────────────────────────────────────────────────────────────────
-trim_step_mode:          "scaled"
-trim_increment:          5
+trim_step_mode:          "absolute"
+trim_increment:          100
 default_max_trim_steps:  50
 consensus_buffer_steps:  20
 max_absolute_trim_steps: 2000
@@ -53,13 +53,13 @@ min_median_read_depth:   100
 
 # ── Changepoint detection ─────────────────────────────────────────────────────
 changepoint_penalty_method:     "MANUAL"
-changepoint_penalty_multiplier: 1
+changepoint_penalty_multiplier: 50
 
 # ── Null model ────────────────────────────────────────────────────────────────
 null_model_p_threshold:     0.05
-null_model_min_consecutive:  3
+null_model_min_consecutive:  2
 null_model_min_trim_bp:      5
-distance_cutoff_threshold:   0.15
+distance_cutoff_threshold:   0.20
 distance_cutoff_min_trim_bp: 5
 
 # ── Consensus ─────────────────────────────────────────────────────────────────
@@ -74,15 +74,18 @@ reference_subset_size:    5000
 # ── Merge ─────────────────────────────────────────────────────────────────────
 merge_method:       "advanced"
 harmonize_metadata: true
+selection_mode: "roster"   # "auto", "file", or "roster"
+selection_file: "/home/users/dterrey/SeCAT/selection_roster.txt"       # path to roster file (only used when selection_mode = "roster")
 
 # ── Reports ───────────────────────────────────────────────────────────────────
 plot_dpi:         300
 force_regenerate: false
 
 # ── Alignment ────────────────────────────────────────────────────────────────
-use_all_asvs_for_mafft: true   # use all ASVs for DECIPHER alignment (false = subsample)
-asv_sample_size:        500    # subsample size when use_all_asvs_for_mafft is false
+use_all_asvs: false   # use all ASVs for DECIPHER alignment (false = subsample)
+asv_sample_size:        5000    # subsample size when use_all_asvs is false
 
 # ── Pipeline stages ───────────────────────────────────────────────────────────
-auto_trim:      false   # trim automatically after verdict (skips manual review)
 run_validation: true    # run multi-tier ecological validation after merge
+auto_trim:      false   # set to true to automatically run trim/merge after verdict (skips manual review)
+                        # when true, selection_mode defaults to "auto" (all KEEP studies included)
