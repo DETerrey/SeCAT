@@ -29,4 +29,4 @@ jobs:
         with:
           context: ./containers
           push: true
-          tags: ghcr.io/derbydt/secat:latest
+          tags: ghcr.io/deterrey/secat:latest
