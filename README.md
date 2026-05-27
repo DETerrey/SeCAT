@@ -1,305 +1,364 @@
 # SeCAT — Sequence Consensus Amplicon Trimming
 
-SeCAT harmonises multi-primer 16S rRNA amplicon datasets for cross-study meta-analysis. It aligns study ASV sequences to a common SILVA reference coordinate space, calculates the consensus trimming region shared across all studies, validates trim decisions against simulation-based null models, and produces a unified feature table ready for downstream community ecology analyses.
+SeCAT is a Nextflow pipeline that **harmonises 16S rRNA amplicon datasets across studies that used different primer pairs**. It aligns every study's ASVs to a common SILVA coordinate space, computes the longest 16S region shared by all studies, validates that trimming to that region does not distort each study's beta-diversity, and emits a unified feature table ready for cross-study meta-analysis.
+
+If you only ever read one paragraph: edit two paths in `params.yaml`, run one Nextflow command, and look in `output/final_outputs/` for your results.
 
 ---
 
-## How it works (brief)
+## Table of contents
 
-1. **Clean** — Remove chloroplasts, mitochondria, empty samples; sync files.
-2. **Map** — Align each study's ASVs to SILVA to find amplicon coordinates.
-3. **Consensus** — Calculate the maximal overlapping 16S region across studies.
-4. **Simulate** — Generate synthetic communities to build null distributions for each study's expected trimming degradation.
-5. **Analyse** — Progressively trim real data and measure beta-diversity degradation at each step.
-6. **Aggregate** — Compare real degradation to null distributions; apply changepoint detection and empirical p-value testing; produce per-study KEEP/EXCLUDE verdicts.
-7. **Report** — Generate per-study PDF diagnostics for manual review.
-8. **Trim & Merge** — Trim sequences to the consensus region, re-cluster across studies, and produce a unified feature table.
-9. **Validate** — Multi-tier ecological validation of the harmonised dataset.
-
----
-
-## Requirements
-
-- [Nextflow](https://nextflow.io/) ≥ 23.04
-- [Singularity](https://sylabs.io/singularity/) ≥ 3.8 **or** Docker ≥ 20
-- SILVA 138 full-length aligned reference FASTA (`SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta`)
+1. [What SeCAT does, in five lines](#what-secat-does-in-five-lines)
+2. [Before you start](#before-you-start)
+3. [If you have never used an HPC before](#if-you-have-never-used-an-hpc-before)
+4. [Installing the dependencies](#installing-the-dependencies)
+5. [Preparing your inputs](#preparing-your-inputs)
+6. [Running SeCAT](#running-secat)
+7. [Understanding the output folder](#understanding-the-output-folder)
+8. [The manual-review pause and the STANDARDIZE step](#the-manual-review-pause-and-the-standardize-step)
+9. [Site-specific HPC configuration](#site-specific-hpc-configuration)
+10. [Resource and runtime expectations](#resource-and-runtime-expectations)
+11. [Troubleshooting](#troubleshooting)
+12. [Parameter reference](#parameter-reference)
+13. [Citation and licence](#citation-and-licence)
 
 ---
 
-## Quick start
+## What SeCAT does, in five lines
 
-### 1. Prepare your manifest
+1. **Cleans** each study (removes chloroplasts/mitochondria/empty samples).
+2. **Maps** every ASV onto the SILVA aligned reference and finds each study's amplicon coordinates.
+3. **Finds the consensus 16S window** — the longest stretch of SILVA covered by *all* studies at once.
+4. **Tests by simulation** whether trimming each study down to that window distorts its community structure beyond what null-model noise would produce.
+5. **Trims and merges** the surviving studies into a single feature table, taxonomy file, FASTA, and metadata table that can be analysed as one cohort.
 
-Copy `assets/manifest_template.tsv` and fill in one row per study. Required columns:
+---
 
-| Column | Description |
-|--------|-------------|
-| `study_name` | Unique identifier for the study |
-| `primer_name` | Primer pair name (e.g., `515F_806R`) |
-| `asv_fasta_path` | Absolute path to ASV representative sequences FASTA |
-| `asv_counts_path` | Absolute path to ASV feature/OTU table (TSV) |
-| `taxonomy_path` | Absolute path to taxonomy assignments (TSV) |
-| `metadata_path` | Absolute path to sample metadata (TSV) |
+## Before you start
 
-Optional columns: `metadata_variable`, `metadata_value` (for environment filtering).
+You will need:
 
-### 2. Edit `params.yaml`
+- A computer (laptop, server, or HPC login node) with **Linux or macOS**. Windows works only through WSL.
+- Around **50 GB of free disk** for a 10-study analysis (most of it is Nextflow's work-cache; SeCAT's own outputs are <1 GB).
+- **At least one machine with 64 GB RAM** to run the SILVA alignment step (laptops will not do this). On an HPC this is automatic; locally you need a workstation or a cloud VM.
+- The **SILVA 138.x aligned reference FASTA**: `SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta`. This is a ~24 GB file. Download once from the SILVA website (https://www.arb-silva.de/) and keep it somewhere persistent — every SeCAT run reads it.
+- One **ASV table, taxonomy file, FASTA and metadata table per study**. These are the outputs of DADA2 / QIIME2 / Deblur. The exact format SeCAT expects is shown in `examples/study_A/` and described in `examples/README.md`.
 
-Set the two required fields:
+You do **not** need to know R or Nextflow to run SeCAT. You do need a working shell and the ability to edit a YAML file.
 
-```yaml
-manifest:     "/path/to/your/secat_manifest.tsv"
-reference_db: "/path/to/SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta"
+---
+
+## If you have never used an HPC before
+
+Skip this section if you already use SLURM.
+
+An HPC (High-Performance Computer) is a cluster of large servers shared by many users. You log in over SSH to a **login node**, but you **never run computation there** — instead you submit jobs to a **scheduler** (here, SLURM), which queues them and runs them on **compute nodes** that have lots of CPU and RAM. Nextflow handles all the job submission for you: from your point of view, you type one `nextflow run …` command on the login node, and Nextflow submits ~100 SLURM jobs over the next 12–24 hours on your behalf, retrying any that fail, gathering results, and writing them back to a shared filesystem.
+
+Vocabulary you will see:
+
+| Term | Meaning |
+|---|---|
+| **Login node** | The machine you SSH into. Don't run heavy work here. |
+| **Compute node** | Where jobs actually run. You get to it via the scheduler. |
+| **SLURM** | The scheduler. Reads job scripts and queues them. |
+| **Partition / queue** | A pool of compute nodes (e.g. `short`, `standard`, `highmem`). Each partition has different limits. |
+| **QoS** | "Quality of Service" — a priority tier inside a partition. JASMIN uses `short`/`standard`/`high`. |
+| **`sinfo`** | Shows partition status (free / down). |
+| **`squeue -u $USER`** | Shows YOUR queued and running jobs. |
+| **`scancel <jobid>`** | Cancels a job. |
+| **`scratch`** | Fast but volatile filesystem. Files older than ~28 days are wiped. Use for working directories. |
+| **`home`** | Slower but permanent. Use for your code and small reference files. |
+| **Module system** | Many HPCs require `module load <name>` to access compilers, Java, etc. JASMIN uses `jaspy` — see below. |
+
+On **JASMIN LOTUS2** specifically (this pipeline's primary target):
+- Log in: `ssh <username>@login1.jasmin.ac.uk` (or `login2`, `login3`).
+- For Nextflow, load Java: `module load jaspy`.
+- The `--qos=high` flag is required for any multi-CPU job (PICRUSt2, SpiecEasi, DESeq2, and any heavy SeCAT step). Standard/long QoS cap at 1 CPU.
+- Scratch is at `/work/scratch-nopw2/<username>/` — wiped after 28 days untouched.
+- XFC (`/work/xfc/vol7/user_cache/<username>/`) is longer-lived (30 days) and has a 10 TB hard quota.
+
+If something below references JASMIN paths and you are on a different cluster, treat the paths as illustrative — you will need to adjust them to your cluster's conventions.
+
+---
+
+## Installing the dependencies
+
+You need three pieces of software on the machine from which you will launch the pipeline (typically the HPC login node):
+
+### 1. Nextflow (>= 23.04)
+
+```bash
+# JASMIN: Java comes from jaspy.
+module load jaspy
+
+# Install Nextflow into your home directory:
+curl -s https://get.nextflow.io | bash
+
+# Move the resulting `nextflow` binary somewhere on your PATH:
+mkdir -p ~/bin && mv nextflow ~/bin/
+echo 'export PATH=$HOME/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+
+nextflow -version
 ```
 
-All other parameters have calibrated defaults — see the full parameter reference below.
+### 2. A container runtime (Singularity OR Docker)
 
-### 3. Run
+- **On an HPC** you almost certainly need **Singularity** (it does not require root, unlike Docker). On JASMIN it is available system-wide — no install needed. Just run `singularity --version` to confirm.
+- **On a laptop or cloud VM** use **Docker Desktop** (or `apt install docker.io` on Ubuntu).
 
+You do **not** need to build any container yourself. SeCAT pulls a pre-built one from GitHub Container Registry (`ghcr.io/derbydt/secat:latest`) on first launch, ~10 minutes.
+
+### 3. The SeCAT pipeline itself
+
+You don't actually install SeCAT — Nextflow can pull it directly from GitHub:
+
+```bash
+nextflow pull DETerrey/SeCAT
+```
+
+This places the pipeline under `~/.nextflow/assets/DETerrey/SeCAT/`. If you prefer a manual checkout (for editing or for offline use), clone it directly:
+
+```bash
+cd ~
+git clone https://github.com/DETerrey/SeCAT.git
+cd SeCAT
+```
+
+The instructions below assume the manual-checkout layout (run commands from inside the cloned `SeCAT/` directory). If you used `nextflow pull`, replace `main.nf` with `DETerrey/SeCAT` in every `nextflow run` command.
+
+---
+
+## Preparing your inputs
+
+You need:
+
+1. **A manifest TSV** — one row per study. Template: `assets/manifest_template.tsv`. Worked example: `examples/manifest_example.tsv` (with column descriptions in `examples/README.md`).
+2. **The SILVA aligned reference FASTA** — download once from https://www.arb-silva.de/. Use the NR99 (non-redundant 99%) full-length aligned and truncated FASTA, e.g. `SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta`.
+3. **An edited `params.yaml`** — minimally, change the two paths near the top:
+   ```yaml
+   manifest:     "/absolute/path/to/your/secat_manifest.tsv"
+   reference_db: "/absolute/path/to/SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta"
+   ```
+
+Before launching anything heavy, validate your inputs with the bundled healthcheck:
+
+```bash
+./secat_healthcheck.sh
+```
+
+The script verifies that all paths listed in your manifest exist and are readable. It is fast (no compute) and catches the most common configuration mistakes — much cheaper than discovering them after a 24-hour SLURM job has run.
+
+See `examples/README.md` for the format requirements of each input file (feature table, taxonomy, FASTA, metadata).
+
+---
+
+## Running SeCAT
+
+### Standard launch (HPC, SLURM + Singularity)
+
+```bash
 nextflow run main.nf \
     -profile slurm,singularity \
     -params-file params.yaml
+```
 
+On JASMIN, also pass the site config:
 
-**Resume after failure:**
+```bash
+nextflow run main.nf \
+    -profile slurm,singularity \
+    -c conf/jasmin.config \
+    -params-file params.yaml
+```
+
+### Local laptop / workstation (Docker)
+
+```bash
+nextflow run main.nf \
+    -profile local,docker \
+    -params-file params.yaml
+```
+
+Only suitable for very small test datasets (<5 studies, <50 simulations). The SILVA alignment step needs 64 GB RAM, which most laptops do not have.
+
+### Resume a failed run
+
+Add `-resume` to any of the above. Nextflow will re-use cached results for every process that completed successfully and only re-run the failed step:
+
 ```bash
 nextflow run main.nf -profile slurm,singularity -params-file params.yaml -resume
 ```
+
+`-resume` works even after a power cut or a manually-killed pipeline, as long as the `work/` directory and `.nextflow/` cache still exist. Do **not** delete those between launches if you might want to resume.
+
+### Submitting Nextflow itself as a background process
+
+On a login node, the safest pattern is to launch Nextflow inside `tmux` (or `screen`) so the pipeline survives a disconnection:
+
+```bash
+tmux new -s secat
+# inside tmux:
+module load jaspy
+nextflow run main.nf -profile slurm,singularity -c conf/jasmin.config -params-file params.yaml -resume
+# detach with Ctrl-b then d
+# reattach later with:  tmux attach -t secat
+```
+
+---
+
+## Understanding the output folder
+
+After a **successful full run** (`auto_trim: true`, or after STANDARDIZE), the only folder you need is `output/final_outputs/`:
+
+```
+output/final_outputs/
+├── tables/
+│   ├── combined_feature_table.tsv         # ← the merged ASV table — feed to phyloseq / qiime2 / vegan
+│   ├── combined_taxonomy.tsv
+│   ├── combined_metadata.tsv
+│   ├── combined_sequences.fasta
+│   └── asv_mapping_final.tsv              # crosswalk: original ASV → harmonised ASV
+├── verdicts/
+│   ├── master_verdict_table.csv           # per study × level: KEEP / EXCLUDE
+│   ├── verdict_data_all_levels.csv        # full diagnostic table behind the verdicts
+│   ├── final_trim_verdicts.csv            # per-study trim coordinates applied
+│   ├── trim_summary.csv                   # bp trimmed from 5'/3' per study
+│   ├── simulation_baseline_statistics.csv # null-model summary stats
+│   └── simulation_retention_curves.csv    # null-model degradation curves
+├── reports/
+│   ├── master_summary_report.pdf          # headline diagnostic — open this first
+│   └── <study>_report.pdf                 # per-study trim diagnostic, one per study
+├── plots/
+│   └── <study>_*.png / .pdf               # individual diagnostic plots
+├── verification/
+│   ├── tier_*_alpha_diversity_*.tsv       # alpha-diversity comparison pre vs post trim
+│   ├── tier_*_beta_diversity_*.tsv        # beta-diversity comparison
+│   ├── tier_*_taxonomic_composition_*.tsv # taxonomic agreement
+│   └── validation.log
+├── comparison/
+│   ├── pre_consensus/                     # tables BEFORE consensus trimming
+│   └── post_consensus/                    # tables AFTER consensus trimming
+│       (kept for full transparency / supplementary methods)
+└── provenance/
+    ├── params_used.yaml                   # every effective parameter for this run
+    ├── manifest_input.tsv                 # the manifest you provided, copied verbatim
+    ├── secat_manifest_clean.tsv           # the cleaned manifest SeCAT actually used
+    └── selection_roster.txt               # which studies were included in the merge
+```
+
+The intermediate folders (`cleaned_data/`, `intermediate/`, `real_data_results/`, `simulation_results/`, `meta_analysis/`, `standardized_datasets/`, `validation/`) are **deleted automatically at end of run** unless `keep_intermediates: true`. The Nextflow `work/` cache is always preserved so `-resume` still works.
+
+---
+
+## The manual-review pause and the STANDARDIZE step
+
+By default (`auto_trim: false`), SeCAT runs the first half of the pipeline (clean → map → simulate → verdict → reports) and then **pauses**. This is deliberate: you should review the per-study verdicts before committing to a 12-hour merge step.
+
+The review loop is:
+
+1. Wait for the first run to finish (you'll see "Pipeline complete. Review verdicts then run:" in the log).
+2. Open `output/final_outputs/reports/master_summary_report.pdf` and the per-study PDFs.
+3. Look at `output/final_outputs/verdicts/verdict_data_all_levels.csv` — each row is a study × taxonomic level with a KEEP/EXCLUDE verdict.
+4. Edit `selection_roster.txt` to list the studies you want in the final merged dataset.
+5. Re-launch with `-entry STANDARDIZE -resume`:
+   ```bash
+   nextflow run main.nf \
+       -profile slurm,singularity \
+       -c conf/jasmin.config \
+       -params-file params.yaml \
+       -entry STANDARDIZE -resume
+   ```
+
+`STANDARDIZE` reads the existing intermediates (which is why cleanup is deferred until after a successful STANDARDIZE run), runs trimming + merging + validation, and writes the final results.
+
+If you trust the automatic KEEP-verdicts and want to skip the manual pause, set `auto_trim: true` and `selection_mode: "auto"` in `params.yaml`. Not recommended for first runs on new datasets.
 
 ---
 
 ## Site-specific HPC configuration
 
-SeCAT uses generic resource labels so it runs on any SLURM or SGE cluster without modification. For clusters that require partition names or account billing flags, pass a custom config:
+SeCAT's `nextflow.config` declares **generic resource labels** (`mem_4g`, `mem_16g`, `mem_64g_cpu4`, etc.) describing what each process needs. A site config file maps those labels to your cluster's actual partition names, billing accounts, and time limits.
 
-nextflow run main.nf \
-    -profile slurm,singularity \
-    -c conf/custom.config \
-    -params-file params.yaml
+- **JASMIN LOTUS2**: a working `conf/jasmin.config` is included. Use it with `-c conf/jasmin.config`.
+- **Any other SLURM cluster**: copy `conf/custom.config`, set the `queue` line to your default partition name, and (optionally) uncomment the per-label overrides for high-memory partitions. Pass it with `-c conf/custom.config`.
+- **SGE clusters**: use `-profile sge,singularity` and no extra config file.
 
+If your data lives on a filesystem that Singularity does not auto-mount inside the container, add a bind:
 
-For JASMIN LOTUS2, a pre-configured file is provided:
-nextflow run main.nf \
-    -profile slurm,singularity \
-    -c conf/jasmin.config \
-    -params-file params.yaml
-
-
-If your data is on a non-standard filesystem (not automounted inside Singularity), add a bind mount:
-```
-singularity.runOptions = '--bind /path/to/your/data:/path/to/your/data'
+```groovy
+singularity.runOptions = '--bind /scratch/projects/myproject:/scratch/projects/myproject'
 ```
 
 ---
 
-## Pipeline workflow
+## Resource and runtime expectations
 
-| Stage | Process | Key output |
-|-------|---------|------------|
-| 0 | Data cleaning & QC | Filtered ASV tables, secat_manifest_clean.tsv |
-| 1 | Study coordinate mapping | SILVA-aligned coordinates per study |
-| 2 | Consensus region calculation | Global overlap coordinates |
-| 3 | Simulation preparation | Task matrix, SILVA reference subset |
-| 4 | Null model generation | Simulated degradation baselines |
-| 5 | Real data trimming analysis | Study-level beta-diversity curves |
-| 6 | Aggregation & verdict table | `verdict_data_all_levels.csv` |
-| 7 | Report generation | Per-study PDF diagnostic reports |
-| 8 | Study selection | `selected_studies_for_trim.txt` |
-| 9 | Sequence trimming | `*_standardized.fasta` |
-| 10 | Dataset merge | Combined feature table, taxonomy, FASTA |
-| 11 | Validation | Multi-tier ecological QC report |
+For a representative meta-analysis (10–15 studies, 100 simulations, full validation):
 
-By default the pipeline pauses after stage 7 for manual verdict review. Set `auto_trim: true` in `params.yaml` to run stages 8–11 automatically.
+| Stage | Memory | CPUs | Wall time |
+|---|---|---|---|
+| Cleaning | 4 GB | 1 | <30 min |
+| Study mapping (DECIPHER alignment to SILVA) | 16–128 GB per study | 1–4 | 2–8 h per study (parallel) |
+| Simulation (per replicate) | 18 GB | 1 | 30 min – 2 h |
+| Real-data analysis | 64 GB | 1 | 2–4 h per study (parallel) |
+| Aggregation | 64 GB | 1 | 2–4 h |
+| Trim & merge | 30 GB | 1 | 4–12 h |
+| Validation | 30 GB | 1 | 1–4 h |
 
-### After manual review
-
-
-# 1. Review output/aggregated_data/verdict_data_all_levels.csv
-# 2. Edit selection_roster.txt to list studies to include
-# 3. Resume trimming + merge + validation:
-nextflow run main.nf \
-    -profile slurm,singularity \
-    -params-file params.yaml \
-    -entry STANDARDIZE \
-    -resume
-
-
----
-
-## Output structure
-
-```
-output/
-├── cleaned_data/               # Stage 0: filtered ASV tables and manifest
-├── intermediate/               # Coordinates, alignments, simulation tasks
-├── real_data_results/          # Per-study degradation curves (.rds)
-├── simulation_results/         # Per-simulation degradation curves (.rds)
-├── aggregated_data/
-│   ├── verdict_data_all_levels.csv   # trimming verdict per study/level
-│   └── master_verdict_table.csv
-├── reports/
-│   ├── *.pdf                         # per-study diagnostic plots
-│   ├── nextflow_report.html          # Nextflow execution report
-│   └── nextflow_timeline.html        # process timeline
-├── standardized_datasets/
-│   └── *_standardized.fasta          # trimmed ASV sequences
-├── meta_analysis/
-│   ├── combined_feature_table.tsv    # unified OTU/ASV table
-│   ├── combined_taxonomy.tsv         # merged taxonomy
-│   ├── combined_sequences.fasta      # merged FASTA
-│   └── combined_metadata.tsv         # harmonised metadata
-└── validation/
-    └── outputs/                      # multi-tier validation results
-```
-
----
-
-## Full parameter reference
-
-All parameters are set in `params.yaml`. Values shown below are the calibrated defaults optimised via systematic testing for minimal Type I error at alpha = 0.05.
-
-### Required
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `manifest` | — | Path to study manifest TSV. Defines the entire study set entering the pipeline. |
-| `reference_db` | — | Path to SILVA aligned FASTA. All trimming coordinates are defined relative to this reference. Changing SILVA version invalidates previously computed consensus regions. |
-
-### Analysis mode
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `analysis_mode` | `"study"` | `"study"` = empirical alignment of each study's ASVs to SILVA (recommended). `"primer"` = use theoretical primer coordinates. Study mode captures study-specific biases (extraction protocol, platform effects). |
-
-### Simulation engine
-
-These control the synthetic community generator that builds null distributions. The null hypothesis is: "observed trimming degradation is consistent with random noise from the simulation model."
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `num_simulations` | 100 | Replicates per study. More = tighter null distributions, more stable p-values. <50 risks unreliable Type I error control. Runtime scales linearly. |
-| `sim_max_silva_subset` | 10000 | Max SILVA sequences in simulation pool. Larger = more diverse null communities but more memory. Diminishing returns above ~15000. |
-| `sim_use_prebuilt_subset` | true | Reuse cached SILVA subset. Set false after changing `sim_max_silva_subset`. |
-| `sim_abundance_model` | `"lognormal"` | Species abundance distribution. Lognormal mimics real community dominance patterns; uniform underestimates rare-taxon trimming effects. |
-| `sim_lognormal_mu` | 5 | Log-normal SAD mean (log scale). Higher = more even communities. |
-| `sim_lognormal_sigma` | 2 | Log-normal SAD standard deviation. Higher = wider abundance range. |
-| `sim_add_pcr_bias` | true | Simulate GC-content-dependent PCR amplification bias. Essential for realistic null distributions. |
-| `sim_pcr_cycles` | 25 | Simulated PCR cycles. More cycles amplify GC bias exponentially. Match to your protocol. |
-| `sim_pcr_gc_bias` | 0.65 | Strength of GC bias (0–1). Higher = stronger differential amplification. |
-| `sim_pcr_optimal_gc` | 0.50 | Optimal GC fraction for PCR efficiency. Sequences near this value are preferentially amplified. |
-| `sim_add_errors` | true | Simulate Illumina-like substitution and indel errors. |
-| `sim_error_rate` | 0.003 | Per-base substitution rate. 0.003 = 0.3%, typical quality-filtered MiSeq. |
-| `sim_indel_rate` | 0.00003 | Per-base indel rate. Extremely rare on Illumina. |
-| `sim_error_position_bias` | true | Errors increase toward 3' end (Illumina quality decay). Critical for trimming-relevant null model. |
-| `sim_add_chimeras` | false | Simulate chimeric sequences. Disabled by default (DADA2/Deblur already remove chimeras). |
-| `sim_chimera_rate` | 0.02 | Fraction chimeric reads (only active when `sim_add_chimeras: true`). |
-
-### Trimming
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `trim_step_mode` | `"absolute"` | `"absolute"` = fixed bp increments; `"scaled"` = increments proportional to amplicon length. Absolute gives uniform resolution; scaled normalises across primer pairs. |
-| `trim_increment` | 100 | Base-pairs per trim step. Smaller = finer resolution but more steps. |
-| `default_max_trim_steps` | 50 | Maximum steps per study. Caps the search space. |
-| `consensus_buffer_steps` | 20 | Extra steps beyond consensus boundary. Ensures degradation curves have sufficient post-change data. |
-| `max_absolute_trim_steps` | 2000 | Hard safety ceiling. Should never be reached normally. |
-
-### Quality filters
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `min_relative_abundance` | 0 | Minimum relative abundance to retain a taxon. 0 = keep all. Higher values reduce noise but may mask rare-taxon impacts. |
-| `min_taxa_for_bray` | 3 | Minimum taxa per sample for Bray-Curtis computation. Prevents degenerate distances from near-empty samples. |
-| `min_median_read_depth` | 100 | Minimum median reads per study. Filters severely undersequenced datasets. |
-
-### Changepoint detection (PELT)
-
-Identifies the trim step where beta-diversity shows a statistically significant shift.
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `changepoint_penalty_method` | `"MANUAL"` | PELT penalty type. `"MANUAL"` = scaled by multiplier below. Other options: `"BIC"`, `"AIC"`. |
-| `changepoint_penalty_multiplier` | 1 | Multiplier for MANUAL penalty (penalty = multiplier × variance). Higher = fewer changepoints detected (more conservative). Lower = more sensitive but higher false positive rate. `params.yaml` may override this to 50 for production runs. |
-
-### Null model comparison
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `null_model_p_threshold` | 0.05 | P-value threshold for null rejection. Lower = more conservative (fewer false positives). |
-| `null_model_min_consecutive` | 3 | Required consecutive significant steps to trigger a verdict. Reduces single-point noise. Higher = fewer false alarms but delayed detection. |
-| `null_model_min_trim_bp` | 5 | Minimum bp trimmed before testing begins. Creates a "dead zone" where trivial trims aren't evaluated. |
-| `distance_cutoff_threshold` | 0.15 | Absolute Bray-Curtis threshold (secondary method). Studies exceeding this are flagged regardless of null model results. Lower = stricter. |
-| `distance_cutoff_min_trim_bp` | 5 | Minimum bp before distance cutoff is evaluated. |
-
-### Consensus region
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `consensus_optimization_threshold` | 0.20 | Maximum tolerable degradation for including a study in the consensus. Higher = more inclusive but accepts more distortion. |
-| `min_consensus_studies` | 3 | Minimum studies contributing to the consensus region. |
-| `min_consensus_coverage` | 0.50 | Minimum fraction of input studies representable in the consensus. |
-
-### Reference alignment
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `reference_alignment_mode` | `"subset"` | `"subset"` = random SILVA subset for speed; `"full"` = entire SILVA DB (requires 64+ GB RAM). |
-| `reference_subset_size` | 5000 | Number of SILVA sequences in subset. Larger = more accurate alignment, diminishing returns above ~10000. |
-
-### Merge
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `merge_method` | `"advanced"` | `"advanced"` = taxonomy-aware with conflict resolution; `"simple"` = direct concatenation. Advanced handles ASV identity conflicts across studies. |
-| `harmonize_metadata` | true | Standardise metadata column names using synonym mapping (e.g., "lat" → "Latitude"). |
-| `selection_mode` | `"roster"` | `"auto"` = include all KEEP studies; `"roster"` = read from a curated file. Manual review recommended for new datasets. |
-
-### Pipeline control
-
-| Parameter | Default | Description & data impact |
-|-----------|---------|---------------------------|
-| `auto_trim` | false | If true, skip manual review and run trim/merge immediately after verdicts. Recommended only for previously vetted datasets. |
-| `run_validation` | true | Run multi-tier ecological validation after merge. |
-| `validation_levels` | `"ASV,Genus,Family"` | Taxonomic levels for validation. More levels = more thorough but slower. |
-
----
-
-## Resource requirements
-
-| Process | Typical memory | CPUs | Time |
-|---------|---------------|------|------|
-| Data cleaning | 4 GB | 1 | < 1 h |
-| Study mapping | 16–64 GB | 1–4 | 2–8 h |
-| Simulation (per replicate) | 8 GB | 1 | 1–4 h |
-| Real data analysis | 16 GB | 1 | 2–4 h |
-| Aggregation | 16–30 GB | 1 | 2–8 h |
-| Merge | 16–48 GB | 1–16 | 4–12 h |
-| Validation | 8–16 GB | 1 | 1–4 h |
-
-Total runtime depends on the number of studies and simulations. A typical 15-study run with 100 simulations completes in 12–24 hours on a SLURM cluster.
+Total wall time on JASMIN LOTUS2: typically **12–24 hours** end-to-end. Most of the elapsed time is queue wait, not compute.
 
 ---
 
 ## Troubleshooting
 
-**Pipeline fails at STUDY_MAPPING with memory errors:** Increase `reference_subset_size` cautiously, or switch to `reference_alignment_mode: "full"` with a high-memory node. Alternatively, set `use_all_asvs: false` and reduce `asv_sample_size`.
+**"ERROR: --manifest is required"** — the pipeline cannot see your `params.yaml`. Make sure you passed `-params-file params.yaml` and that the file is in the working directory.
 
-**Too many studies flagged as EXCLUDE:** Consider increasing `changepoint_penalty_multiplier` (makes changepoint detection more conservative), or increasing `distance_cutoff_threshold` (tolerates more compositional change).
+**"ERROR: Missing study files referenced in manifest"** — at least one path in the manifest does not exist or is unreadable. Run `./secat_healthcheck.sh` to identify which.
 
-**Too few studies flagged (permissive verdicts):** Decrease `changepoint_penalty_multiplier` or lower `null_model_p_threshold`.
+**Container pull fails (`Failed to pull singularity image`)** — your compute nodes have no outbound HTTPS. Pre-pull from the login node and point Nextflow at the local image:
+```bash
+singularity pull docker://ghcr.io/derbydt/secat:latest
+# then in conf/custom.config or jasmin.config:
+process.container = '/absolute/path/to/secat_latest.sif'
+```
 
-**Simulations take too long:** Reduce `num_simulations` to 50 for exploratory runs. Increase back to 100+ for final analysis.
+**STUDY_MAPPING fails with out-of-memory** — Increase `reference_subset_size` slowly, or switch to `reference_alignment_mode: "full"` on a high-memory node. As a workaround, set `use_all_asvs: false` and reduce `asv_sample_size`.
 
-**Container pull fails:** Ensure network access to ghcr.io. Alternatively, pre-pull: `singularity pull docker://ghcr.io/derbydt/secat:latest`
+**Too many studies flagged EXCLUDE** — your dataset may genuinely be too heterogeneous for the chosen consensus region, or your thresholds may be too strict. Try `changepoint_penalty_multiplier: 5` (more conservative changepoint detection) or raise `distance_cutoff_threshold` to 0.20.
+
+**Too few studies flagged EXCLUDE (over-permissive)** — drop `changepoint_penalty_multiplier` to 0.5 and `null_model_p_threshold` to 0.01.
+
+**`STANDARDIZE` complains it cannot find `output/intermediate/`** — the cleanup step deleted it. Set `keep_intermediates: true` and re-launch from the beginning, or run STANDARDIZE in the same Nextflow invocation as the verdict step (`auto_trim: true`).
+
+**JASMIN: jobs sit pending forever** — check `sinfo`, `squeue -u $USER`, and the `--account=` flag in `conf/jasmin.config`. The default `--account=no-project` works for unattached users; for project allocations, change it to your project code.
+
+**JASMIN: "QOSGroupMaxCpu" error** — your QoS tier caps total concurrent CPUs. Reduce `executor.queueSize` in `conf/jasmin.config` from 200 to 50.
 
 ---
 
-## Citation
+## Parameter reference
 
-Terrey D. et al. (in preparation). SeCAT: a bioinformatics pipeline for cross-study harmonisation of 16S rRNA amplicon datasets.
+The full annotated reference for every parameter lives in `params.yaml` (in the project root). The `nextflow.config` file documents the same parameters in their default form. The `examples/params_example.yaml` shows the minimal subset you would typically set.
+
+The three knobs that most affect verdicts (and thus which studies enter your merged dataset) are:
+
+| Parameter | Default | Effect |
+|---|---|---|
+| `null_model_p_threshold` | 0.05 | Alpha for the null-model significance test. Lower = stricter. |
+| `changepoint_penalty_multiplier` | 1 | PELT changepoint penalty scale. Higher = fewer changepoints = more KEEP verdicts. |
+| `distance_cutoff_threshold` | 0.15 | Bray-Curtis cutoff for the secondary verdict test. Lower = stricter. |
+
+**Document any deviation from these defaults in your methods section** — they materially affect which studies you ultimately include.
 
 ---
 
-## Licence
+## Citation and licence
 
-MIT
+If you use SeCAT in published work, please cite:
+
+> Terrey, D., et al. *SeCAT: Sequence Consensus Amplicon Trimming for cross-study harmonisation of 16S rRNA microbiome datasets.* (Manuscript in preparation.)
+
+Licence: MIT. See `LICENSE` for details.
+
+Issue tracker: https://github.com/DETerrey/SeCAT/issues

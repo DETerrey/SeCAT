@@ -3,6 +3,9 @@ process GENERATE_REPORT {
     label 'mem_64g_cpu4'
     publishDir "${params.outdir}/reports",     mode: 'copy', pattern: "*.pdf"
     publishDir "${params.outdir}/final_plots", mode: 'copy', pattern: "final_plots/**"
+    // Duplicate user-facing PDFs and plots into final_outputs/
+    publishDir "${params.final_outputs}/${params.final_outputs_reports_dir}", mode: 'copy', pattern: "*.pdf"
+    publishDir "${params.final_outputs}/${params.final_outputs_plots_dir}",   mode: 'copy', pattern: "final_plots/**", saveAs: { f -> f.replaceFirst('^final_plots/', '') }
 
     input:
     path aggregated_dir

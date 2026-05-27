@@ -1,0 +1,4 @@
+SampleID	HolobiontArea	Host_Species	Latitude	Longitude	Sampling_Date	Depth_m	Salinity_psu	Temperature_C
+SampleA1	Rhizosphere	Zostera_marina	52.4519	-4.0625	2024-06-15	2.1	34.2	14.8
+SampleA2	Rhizosphere	Zostera_marina	52.4519	-4.0625	2024-06-15	2.1	34.2	14.8
+SampleA3	Phyllosphere	Zostera_marina	52.4519	-4.0625	2024-06-15	2.1	34.2	14.8

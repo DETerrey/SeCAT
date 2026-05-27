@@ -1,0 +1,74 @@
+# ==============================================================================
+# params_example.yaml — minimal annotated SeCAT parameter file
+#
+# Copy this file, edit the two `manifest` and `reference_db` paths, then run:
+#
+#   nextflow run main.nf \
+#       -profile slurm,singularity \
+#       -params-file params_example.yaml
+#
+# Every parameter is optional EXCEPT manifest and reference_db. Anything you
+# omit falls back to the defaults in nextflow.config (which are calibrated for
+# typical 16S meta-analyses).
+#
+# A fully annotated version of every parameter lives in the project root at
+# `params.yaml`. This file shows the minimum you actually need to set.
+# ==============================================================================
+
+# ── REQUIRED ──────────────────────────────────────────────────────────────────
+manifest:     "/absolute/path/to/your/secat_manifest.tsv"
+reference_db: "/absolute/path/to/SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta"
+
+# ── OUTPUT ────────────────────────────────────────────────────────────────────
+# Working directory for all intermediate outputs. Cleaned up automatically at
+# end of run unless keep_intermediates: true (see below).
+outdir: "output"
+
+# Single consolidated user-facing results directory. After a successful full
+# run, this is the only folder you need to look in for results.
+# Default: ${outdir}/final_outputs
+# Override to a separate location, e.g. /home/users/dterrey/SeCAT_results
+# final_outputs: "/home/users/dterrey/SeCAT_results"
+
+# If true, intermediate publishDir trees (cleaned_data, intermediate, etc.)
+# are kept after the run. Default false — they are removed to save disk space,
+# and final_outputs/ is preserved. The Nextflow work/ cache is always kept so
+# -resume works regardless.
+keep_intermediates: false
+
+# ── ANALYSIS MODE ─────────────────────────────────────────────────────────────
+# "study" = empirical ASV-to-SILVA alignment per study (recommended).
+# "primer" = parse coordinates from primer-name strings (legacy, not currently maintained).
+analysis_mode: "study"
+
+# ── PIPELINE FLOW ─────────────────────────────────────────────────────────────
+# auto_trim=false  → pipeline pauses after verdicts. You manually review,
+#                    edit selection_roster.txt, then re-run with -entry STANDARDIZE.
+# auto_trim=true   → end-to-end, no pause. Use only on previously vetted data.
+auto_trim:      false
+run_validation: true
+
+# Study selection at the trim step. "roster" reads the file below; "auto" includes
+# every KEEP-verdict study.
+selection_mode: "roster"
+selection_file: "/absolute/path/to/your/selection_roster.txt"
+
+# ── SIMULATION ENGINE (used to build the null model) ──────────────────────────
+# 100 replicates is the publication-ready default. Drop to 50 for exploratory
+# runs to halve runtime; raise to 500+ for tight p-value estimates.
+num_simulations: 100
+
+# ── STATISTICAL THRESHOLDS ────────────────────────────────────────────────────
+# These are the headline knobs. Changing them materially affects which studies
+# get KEEP vs EXCLUDE verdicts. Document any deviation from defaults in your
+# methods section.
+null_model_p_threshold:         0.05   # alpha for the null-model test
+null_model_min_consecutive:     3      # consecutive significant steps to trigger
+distance_cutoff_threshold:      0.15   # Bray-Curtis cutoff (secondary verdict)
+changepoint_penalty_method:     "MANUAL"
+changepoint_penalty_multiplier: 1      # higher = fewer changepoints (more conservative)
+
+# ── EVERYTHING ELSE ───────────────────────────────────────────────────────────
+# All other parameters (simulation realism, alignment subset size, merge method,
+# validation levels) default to sensible values. See nextflow.config for the
+# full reference, or the annotated `params.yaml` in the project root.
