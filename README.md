@@ -53,9 +53,9 @@ You do **not** need to know R or Nextflow to run SeCAT. You do need a working sh
 
 ## If you have never used an HPC before
 
-Skip this section if you already use SLURM.
+Skip this section if you already use SLURM (or SGE/LSF).
 
-An HPC (High-Performance Computer) is a cluster of large servers shared by many users. You log in over SSH to a **login node**, but you **never run computation there** — instead you submit jobs to a **scheduler** (here, SLURM), which queues them and runs them on **compute nodes** that have lots of CPU and RAM. Nextflow handles all the job submission for you: from your point of view, you type one `nextflow run …` command on the login node, and Nextflow submits ~100 SLURM jobs over the next 12–24 hours on your behalf, retrying any that fail, gathering results, and writing them back to a shared filesystem.
+An HPC (High-Performance Computer) is a cluster of large servers shared by many users. You log in over SSH to a **login node**, but you **never run computation there** — instead you submit jobs to a **scheduler** (most commonly SLURM, sometimes SGE or LSF), which queues them and runs them on **compute nodes** that have lots of CPU and RAM. Nextflow handles all the job submission for you: from your point of view, you type one `nextflow run …` command on the login node, and Nextflow submits ~100 jobs over the next 12–24 hours on your behalf, retrying any that fail, gathering results, and writing them back to a shared filesystem.
 
 Vocabulary you will see:
 
@@ -63,24 +63,35 @@ Vocabulary you will see:
 |---|---|
 | **Login node** | The machine you SSH into. Don't run heavy work here. |
 | **Compute node** | Where jobs actually run. You get to it via the scheduler. |
-| **SLURM** | The scheduler. Reads job scripts and queues them. |
+| **SLURM** | The most widely used HPC scheduler. Reads job scripts and queues them. (SGE and LSF are alternatives; SeCAT supports all three.) |
 | **Partition / queue** | A pool of compute nodes (e.g. `short`, `standard`, `highmem`). Each partition has different limits. |
-| **QoS** | "Quality of Service" — a priority tier inside a partition. JASMIN uses `short`/`standard`/`high`. |
-| **`sinfo`** | Shows partition status (free / down). |
-| **`squeue -u $USER`** | Shows YOUR queued and running jobs. |
-| **`scancel <jobid>`** | Cancels a job. |
-| **`scratch`** | Fast but volatile filesystem. Files older than ~28 days are wiped. Use for working directories. |
+| **QoS** | "Quality of Service" — a priority tier inside a partition (some sites only). Common tier names: `short`, `standard`, `high`. |
+| **`sinfo`** | (SLURM) Shows partition status (free / down). SGE equivalent: `qhost`. |
+| **`squeue -u $USER`** | (SLURM) Shows YOUR queued and running jobs. SGE equivalent: `qstat -u $USER`. |
+| **`scancel <jobid>`** | (SLURM) Cancels a job. SGE equivalent: `qdel`. |
+| **`scratch`** | Fast but often time-limited filesystem. Many sites auto-delete files older than 28–90 days. Use for working directories. |
 | **`home`** | Slower but permanent. Use for your code and small reference files. |
-| **Module system** | Many HPCs require `module load <name>` to access compilers, Java, etc. JASMIN uses `jaspy` — see below. |
+| **Module system** | Many HPCs require `module load <name>` to access compilers, Java, R, etc. Common environment modules: `module load java`, `module load r`, `module load singularity`. |
 
-On **JASMIN LOTUS2** specifically (this pipeline's primary target):
-- Log in: `ssh <username>@login1.jasmin.ac.uk` (or `login2`, `login3`).
-- For Nextflow, load Java: `module load jaspy`.
-- The `--qos=high` flag is required for any multi-CPU job (PICRUSt2, SpiecEasi, DESeq2, and any heavy SeCAT step). Standard/long QoS cap at 1 CPU.
-- Scratch is at `/work/scratch-nopw2/<username>/` — wiped after 28 days untouched.
-- XFC (`/work/xfc/vol7/user_cache/<username>/`) is longer-lived (30 days) and has a 10 TB hard quota.
+What you need to find out about *your* cluster before launching SeCAT:
 
-If something below references JASMIN paths and you are on a different cluster, treat the paths as illustrative — you will need to adjust them to your cluster's conventions.
+1. **Scheduler type** — almost always SLURM in academic HPCs, occasionally SGE or LSF.
+2. **Default partition / queue name** — ask your site admin or check `sinfo`. Common names: `compute`, `batch`, `normal`, `short`, `all.q`.
+3. **Whether you need an `--account=` flag** — most shared university clusters require this for billing/quota.
+4. **How to make Java ≥ 11 available** — Nextflow needs Java to run. Either `module load java` (if your site provides it), or install OpenJDK into your home directory.
+5. **Whether Singularity is available** — `singularity --version` from the login node. If not, ask your admin (it's standard on academic HPCs).
+6. **Scratch path conventions** — where can you write large temporary files, and what's the retention policy?
+
+With those six answers you can populate `conf/custom.config` (described in [Site-specific HPC configuration](#site-specific-hpc-configuration) below) and launch SeCAT on any SLURM cluster.
+
+> **Worked example — JASMIN LOTUS2** (UK NERC HPC, the pipeline's primary test environment). Skip if you're on a different site; the same six questions apply to yours.
+>
+> - Log in: `ssh <username>@login1.jasmin.ac.uk` (or `login2`, `login3`).
+> - Make Java available: `module load jaspy`.
+> - Default partition: `standard`. QoS tiers: `short`/`standard`/`high`. The `--qos=high` flag is required for any multi-CPU job — `short`/`standard` cap at 1 CPU per task.
+> - Scratch: `/work/scratch-nopw2/<username>/` — auto-deleted after 28 days untouched.
+> - Long-lived workspace: `/work/xfc/vol7/user_cache/<username>/` (30-day retention, 10 TB quota).
+> - Pre-configured site file: `conf/jasmin.config` (included in this repo) — pass with `-c conf/jasmin.config`.
 
 ---
 
@@ -90,11 +101,20 @@ You need three pieces of software on the machine from which you will launch the 
 
 ### 1. Nextflow (>= 23.04)
 
-```bash
-# JASMIN: Java comes from jaspy.
-module load jaspy
+Nextflow needs Java 11 or later. How you make it available depends on your site:
 
-# Install Nextflow into your home directory:
+```bash
+# Option A — use your site's module system (most academic HPCs):
+module load java          # or `module load java/11`, `module load openjdk`, etc.
+# Examples for specific sites:
+#   JASMIN:    module load jaspy
+#   ARCHER2:   module load PrgEnv-gnu  java
+#   Cirrus:    module load openjdk
+
+# Option B — install OpenJDK into your home directory (no module system, or older sites):
+#   Download OpenJDK 17 from https://adoptium.net/, extract, and add to PATH.
+
+# Then install Nextflow itself (system-agnostic):
 curl -s https://get.nextflow.io | bash
 
 # Move the resulting `nextflow` binary somewhere on your PATH:
@@ -102,7 +122,7 @@ mkdir -p ~/bin && mv nextflow ~/bin/
 echo 'export PATH=$HOME/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
 
-nextflow -version
+nextflow -version       # confirm install
 ```
 
 ### 2. A container runtime (Singularity OR Docker)
@@ -160,20 +180,29 @@ See `examples/README.md` for the format requirements of each input file (feature
 
 ### Standard launch (HPC, SLURM + Singularity)
 
+The minimum command — works on any SLURM cluster with a single default partition that doesn't require billing/account flags:
+
 ```bash
 nextflow run main.nf \
     -profile slurm,singularity \
     -params-file params.yaml
 ```
 
-On JASMIN, also pass the site config:
+For most real clusters you'll also need a **site config** that maps SeCAT's generic resource labels (`mem_4g`, `mem_16g`, `mem_64g_cpu4`, etc.) to your cluster's partition names, account flags, and time limits. Pass it with `-c`:
 
 ```bash
 nextflow run main.nf \
     -profile slurm,singularity \
-    -c conf/jasmin.config \
+    -c conf/custom.config \
     -params-file params.yaml
 ```
+
+`conf/custom.config` is a fully commented template — copy it, fill in your cluster's queue name and any account flags, and use it as your launch config from then on. See [Site-specific HPC configuration](#site-specific-hpc-configuration) for what to put in it.
+
+> **Worked example — JASMIN LOTUS2**: a pre-filled site config (`conf/jasmin.config`) is shipped with this repo. Use it directly:
+> ```bash
+> nextflow run main.nf -profile slurm,singularity -c conf/jasmin.config -params-file params.yaml
+> ```
 
 ### Local laptop / workstation (Docker)
 
@@ -202,11 +231,17 @@ On a login node, the safest pattern is to launch Nextflow inside `tmux` (or `scr
 ```bash
 tmux new -s secat
 # inside tmux:
-module load jaspy
-nextflow run main.nf -profile slurm,singularity -c conf/jasmin.config -params-file params.yaml -resume
+module load java                                     # or your site's equivalent
+nextflow run main.nf \
+    -profile slurm,singularity \
+    -c conf/custom.config \
+    -params-file params.yaml \
+    -resume
 # detach with Ctrl-b then d
 # reattach later with:  tmux attach -t secat
 ```
+
+Most HPCs allow login nodes to host long-running shell sessions like `tmux` indefinitely, but check your site's policy — some clusters reap idle sessions after a few days. If yours does, use the scheduler to submit Nextflow itself as a long-running job (a "head job" pattern); ask your admin for the local convention.
 
 ---
 
@@ -281,16 +316,77 @@ If you trust the automatic KEEP-verdicts and want to skip the manual pause, set 
 
 ## Site-specific HPC configuration
 
-SeCAT's `nextflow.config` declares **generic resource labels** (`mem_4g`, `mem_16g`, `mem_64g_cpu4`, etc.) describing what each process needs. A site config file maps those labels to your cluster's actual partition names, billing accounts, and time limits.
+SeCAT's `nextflow.config` declares **generic resource labels** (`mem_4g`, `mem_16g`, `mem_64g_cpu4`, etc.) describing what each process needs. A site config file maps those labels to your cluster's actual partition names, billing accounts, and time limits. This is what makes the pipeline portable across HPCs without modifying its source.
 
-- **JASMIN LOTUS2**: a working `conf/jasmin.config` is included. Use it with `-c conf/jasmin.config`.
-- **Any other SLURM cluster**: copy `conf/custom.config`, set the `queue` line to your default partition name, and (optionally) uncomment the per-label overrides for high-memory partitions. Pass it with `-c conf/custom.config`.
-- **SGE clusters**: use `-profile sge,singularity` and no extra config file.
+### Building a config for your SLURM cluster
 
-If your data lives on a filesystem that Singularity does not auto-mount inside the container, add a bind:
+Copy `conf/custom.config` and edit:
+
+```groovy
+process {
+    // 1. Default partition / queue name on your cluster
+    queue = 'compute'                       // ← replace with yours
+
+    // 2. Account flag if your cluster requires billing/quota tracking
+    // clusterOptions = '--account=YOUR_PROJECT_CODE'
+
+    // 3. (Optional) Per-label overrides — only needed if certain memory tiers
+    //    require a different partition (e.g. 'highmem' for >32GB jobs).
+    // withLabel: 'mem_64g' {
+    //     queue          = 'highmem'
+    //     clusterOptions = '--account=YOUR_PROJECT_CODE --mem=64G'
+    // }
+}
+```
+
+Then launch with `-c conf/custom.config`. The file is heavily commented; read it once before editing.
+
+### Worked examples for specific sites
+
+**JASMIN LOTUS2** (UK NERC HPC) — a complete `conf/jasmin.config` is shipped with the repo. Notable settings: `queue = 'standard'`, `--account=no-project` (for unattached users — change to your project code if you have one), and `--qos=high` for the heavy `STUDY_MAPPING` step.
+
+**A generic university SLURM cluster** with default `compute` partition and project billing:
+
+```groovy
+process {
+    queue          = 'compute'
+    clusterOptions = '--account=myproject'
+}
+```
+
+**A SLURM cluster with a separate high-memory partition**:
+
+```groovy
+process {
+    queue = 'compute'
+    withLabel: 'mem_64g'        { queue = 'highmem' }
+    withLabel: 'mem_64g_cpu4'   { queue = 'highmem' }
+    withLabel: 'mem_48g_cpu16'  { queue = 'parallel' }
+}
+```
+
+**SGE / Oracle Grid Engine clusters**: use `-profile sge,singularity` instead of `slurm,singularity`. No custom config usually needed — the `sge` profile in `nextflow.config` already maps every label to appropriate `clusterOptions` flags (`-pe smp N`, `h_vmem`, etc.).
+
+**LSF clusters** (IBM Platform LSF): use `-profile lsf,singularity`. You may need to add a custom config with `process.queue` and any project-specific bsub flags.
+
+### Singularity bind mounts
+
+If your input data lives on a filesystem that Singularity doesn't auto-mount inside containers (common on sites with dedicated storage volumes), add a bind to your custom config:
 
 ```groovy
 singularity.runOptions = '--bind /scratch/projects/myproject:/scratch/projects/myproject'
+```
+
+### Scheduler rate limits
+
+If your cluster throttles rapid job submission (some do, to protect the scheduler), reduce Nextflow's submit rate:
+
+```groovy
+executor {
+    queueSize       = 100
+    pollInterval    = '30 sec'
+    submitRateLimit = '20/1min'
+}
 ```
 
 ---
@@ -319,24 +415,31 @@ Total wall time on JASMIN LOTUS2: typically **12–24 hours** end-to-end. Most o
 
 **"ERROR: Missing study files referenced in manifest"** — at least one path in the manifest does not exist or is unreadable. Run `./secat_healthcheck.sh` to identify which.
 
-**Container pull fails (`Failed to pull singularity image`)** — your compute nodes have no outbound HTTPS. Pre-pull from the login node and point Nextflow at the local image:
+**Container pull fails (`Failed to pull singularity image`)** — your compute nodes have no outbound HTTPS access (common on secure clusters). Pre-pull the container from the login node and point Nextflow at the local image:
 ```bash
 singularity pull docker://ghcr.io/derbydt/secat:latest
-# then in conf/custom.config or jasmin.config:
+# then in your site config:
 process.container = '/absolute/path/to/secat_latest.sif'
 ```
 
+**Jobs sit `PENDING` in the queue forever** — three things to check, in order:
+1. Is your cluster busy? Run `sinfo` (SLURM) or `qstat` (SGE) and look at partition load.
+2. Is your `--account=` flag (in your site config) valid and within quota? Ask your admin if unsure.
+3. Are you exceeding a concurrent-job or CPU limit set by your QoS tier? Reduce `executor.queueSize` in your site config (default 200; try 50).
+
 **STUDY_MAPPING fails with out-of-memory** — Increase `reference_subset_size` slowly, or switch to `reference_alignment_mode: "full"` on a high-memory node. As a workaround, set `use_all_asvs: false` and reduce `asv_sample_size`.
 
-**Too many studies flagged EXCLUDE** — your dataset may genuinely be too heterogeneous for the chosen consensus region, or your thresholds may be too strict. Try `changepoint_penalty_multiplier: 5` (more conservative changepoint detection) or raise `distance_cutoff_threshold` to 0.20.
+**Too many studies flagged EXCLUDE** — your dataset may genuinely be too heterogeneous for the chosen consensus region, or your thresholds may be too strict. See [Parameter calibration](#parameter-calibration) before deviating from defaults; a calibration-aware first try is `distance_cutoff_threshold: 0.20`.
 
-**Too few studies flagged EXCLUDE (over-permissive)** — drop `changepoint_penalty_multiplier` to 0.5 and `null_model_p_threshold` to 0.01.
+**Too few studies flagged EXCLUDE (over-permissive)** — drop `null_model_p_threshold` to 0.01 and increase `null_model_min_consecutive` to 5. Read the calibration section before bigger changes — over-tuning these dismantles the FPR safety net.
 
 **`STANDARDIZE` complains it cannot find `output/intermediate/`** — the cleanup step deleted it. Set `keep_intermediates: true` and re-launch from the beginning, or run STANDARDIZE in the same Nextflow invocation as the verdict step (`auto_trim: true`).
 
-**JASMIN: jobs sit pending forever** — check `sinfo`, `squeue -u $USER`, and the `--account=` flag in `conf/jasmin.config`. The default `--account=no-project` works for unattached users; for project allocations, change it to your project code.
-
-**JASMIN: "QOSGroupMaxCpu" error** — your QoS tier caps total concurrent CPUs. Reduce `executor.queueSize` in `conf/jasmin.config` from 200 to 50.
+> **JASMIN-specific troubleshooting**
+>
+> - **Jobs pending forever**: check the `--account=` flag in `conf/jasmin.config`. The default `--account=no-project` works for unattached users; for project allocations, change it to your project code.
+> - **`QOSGroupMaxCpu` error**: your QoS tier caps total concurrent CPUs. Reduce `executor.queueSize` in `conf/jasmin.config` from 200 to 50.
+> - **`STUDY_MAPPING` needs `--qos=high`**: it's already set in `conf/jasmin.config`. If you've overridden this, the default `standard` QoS caps CPUs at 1 and will fail multi-CPU jobs.
 
 ---
 
