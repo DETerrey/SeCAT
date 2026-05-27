@@ -63,7 +63,7 @@ suppressPackageStartupMessages({
 
 # --- Configure I/O Paths ---
 # Environment variables allow Nextflow to inject paths; fallbacks enable local runs
-Read paths from environment (Nextflow mode) with fallback for direct invocation
+# Read paths from environment (Nextflow mode) with fallback for direct invocation
 MANIFEST_IN  <- Sys.getenv("SECAT_MANIFEST",  unset = "secat_manifest.tsv")
 OUTDIR       <- Sys.getenv("SECAT_OUTDIR",     unset = ".")
 MANIFEST_OUT <- file.path(OUTDIR, "cleaned_data", "secat_manifest_clean.tsv")
