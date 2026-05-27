@@ -4,6 +4,8 @@ SeCAT is a Nextflow pipeline that **harmonises 16S rRNA amplicon datasets across
 
 If you only ever read one paragraph: edit two paths in `params.yaml`, run one Nextflow command, and look in `output/final_outputs/` for your results.
 
+> **A note on the defaults.** The statistical thresholds shipped with SeCAT (`null_model_p_threshold`, `changepoint_penalty_multiplier`, `distance_cutoff_threshold`, `num_simulations`, and the simulation-engine parameters) are **calibrated through a systematic parameter-sensitivity study**, not arbitrary picks. They were selected to give optimal Type I error control at α = 0.05 across the seagrass meta-analysis test set. If you change any of them, report the deviation explicitly in your methods section — see [Parameter calibration](#parameter-calibration) below.
+
 ---
 
 ## Table of contents
@@ -19,8 +21,9 @@ If you only ever read one paragraph: edit two paths in `params.yaml`, run one Ne
 9. [Site-specific HPC configuration](#site-specific-hpc-configuration)
 10. [Resource and runtime expectations](#resource-and-runtime-expectations)
 11. [Troubleshooting](#troubleshooting)
-12. [Parameter reference](#parameter-reference)
-13. [Citation and licence](#citation-and-licence)
+12. [Parameter calibration](#parameter-calibration)
+13. [Parameter reference](#parameter-reference)
+14. [Citation and licence](#citation-and-licence)
 
 ---
 
@@ -334,6 +337,43 @@ process.container = '/absolute/path/to/secat_latest.sif'
 **JASMIN: jobs sit pending forever** — check `sinfo`, `squeue -u $USER`, and the `--account=` flag in `conf/jasmin.config`. The default `--account=no-project` works for unattached users; for project allocations, change it to your project code.
 
 **JASMIN: "QOSGroupMaxCpu" error** — your QoS tier caps total concurrent CPUs. Reduce `executor.queueSize` in `conf/jasmin.config` from 200 to 50.
+
+---
+
+## Parameter calibration
+
+SeCAT's defaults are **not arbitrary**. They were selected by a systematic optimisation pass over the global seagrass 16S meta-analysis test set, targeting optimal Type I error control at α = 0.05. The parameters most sensitive to that calibration are:
+
+| Parameter | Default | What it controls | Sensitivity |
+|---|---|---|---|
+| `null_model_p_threshold` | 0.05 | Alpha for the empirical null-model significance test | High — directly determines KEEP/EXCLUDE rate |
+| `null_model_min_consecutive` | 3 | Required consecutive significant trim steps before a verdict triggers | Moderate — reduces single-point false positives |
+| `changepoint_penalty_method` | `MANUAL` | PELT penalty type | Low — `MANUAL` gives direct control |
+| `changepoint_penalty_multiplier` | 1 | Scale on the MANUAL penalty (relative to data variance) | **High** — calibrated specifically for `num_simulations = 100` |
+| `distance_cutoff_threshold` | 0.15 | Bray–Curtis cutoff for the secondary distance-based verdict | High — strict cutoffs flag more studies |
+| `num_simulations` | 100 | Null distribution replicates per study | Moderate — fewer = noisier p-values |
+| `sim_pcr_gc_bias`, `sim_pcr_cycles`, `sim_error_rate` | (see params.yaml) | PCR/error-model realism | Moderate — calibrated against typical Illumina MiSeq profiles |
+
+### Why this matters
+
+The penalty multiplier and the consecutive-steps requirement together suppress noise-driven changepoints; lowering them is the most common way users accidentally over-flag studies. The `distance_cutoff_threshold` of 0.15 was set to be just sensitive enough to catch ecologically meaningful Bray–Curtis shifts without flagging stochastic noise at the read-depth tail. Halving it (to 0.075) is roughly equivalent to doubling the rejection rate.
+
+### If you change a default
+
+You must do two things:
+
+1. **Document it.** Record the change in your methods section, alongside the rationale and ideally a sensitivity analysis (re-run with the published default for comparison).
+2. **Save the provenance file.** `output/final_outputs/provenance/params_used.yaml` records every effective parameter for the run — keep it with your manuscript supplementary material so reviewers can reproduce your call set.
+
+### When to deviate
+
+Three legitimate reasons to override defaults:
+
+- **Underpowered datasets** (<5 studies, <30 samples per study) — consider increasing `null_model_min_consecutive` to 5 to suppress small-sample noise.
+- **Strongly heterogeneous primer sets** (V1–V3 + V4 + V6–V8 in one analysis) — relaxing `distance_cutoff_threshold` to 0.20 may be needed to retain enough studies for a viable consensus.
+- **Publication-quality runs** — increase `num_simulations` to 500 to tighten p-value estimates. The changepoint penalty multiplier should then be re-tuned (it scales with `num_simulations`); a starting point is `changepoint_penalty_multiplier ≈ 5` at 500 simulations.
+
+For anything else, the defaults represent the most defensible starting point.
 
 ---
 
