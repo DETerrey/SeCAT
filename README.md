@@ -342,38 +342,34 @@ process.container = '/absolute/path/to/secat_latest.sif'
 
 ## Parameter calibration
 
-SeCAT's defaults are **not arbitrary**. They were selected by a systematic optimisation pass over the global seagrass 16S meta-analysis test set, targeting optimal Type I error control at α = 0.05. The parameters most sensitive to that calibration are:
+SeCAT's defaults are **not arbitrary**. They are the outcome of a systematic FPR/sensitivity calibration study (false-positive rate measured under a no-signal null; sensitivity measured under controlled-magnitude spike-ins). Three detectors are used in combination, and each has a distinct sensitivity/specificity profile that the defaults were tuned against:
 
-| Parameter | Default | What it controls | Sensitivity |
+| Detector | Parameter (default) | Calibrated behaviour | Role in the ensemble |
 |---|---|---|---|
-| `null_model_p_threshold` | 0.05 | Alpha for the empirical null-model significance test | High — directly determines KEEP/EXCLUDE rate |
-| `null_model_min_consecutive` | 3 | Required consecutive significant trim steps before a verdict triggers | Moderate — reduces single-point false positives |
-| `changepoint_penalty_method` | `MANUAL` | PELT penalty type | Low — `MANUAL` gives direct control |
-| `changepoint_penalty_multiplier` | 1 | Scale on the MANUAL penalty (relative to data variance) | **High** — calibrated specifically for `num_simulations = 100` |
-| `distance_cutoff_threshold` | 0.15 | Bray–Curtis cutoff for the secondary distance-based verdict | High — strict cutoffs flag more studies |
-| `num_simulations` | 100 | Null distribution replicates per study | Moderate — fewer = noisier p-values |
-| `sim_pcr_gc_bias`, `sim_pcr_cycles`, `sim_error_rate` | (see params.yaml) | PCR/error-model realism | Moderate — calibrated against typical Illumina MiSeq profiles |
+| **Null model** | `null_model_p_threshold` = 0.05, `null_model_min_consecutive` = 3 | Near-zero FPR across the parameter grid (FPR = 0 at `p ≤ 0.01, min_consecutive ≥ 3`). Near-zero standalone sensitivity. | High-specificity confirmatory signal — almost never fires falsely. |
+| **Distance cutoff** | `distance_cutoff_threshold` = 0.15 | FPR ≈ 0.006 at 0.15; remains well below 0.05 across the 0.10–0.30 range. Fires at lag = 0 (exactly at the true signal). Sensitivity is approximately linear with spike size (~80% at Δ = 0.3, ~5% at Δ = 0.1). | **Primary detector** — well-calibrated and the workhorse of the ensemble. |
+| **Changepoint (PELT)** | `changepoint_penalty_multiplier` = 50 (params.yaml) / 1 (nextflow.config) | FPR ≈ 0.70 at low multipliers; drops below 0.05 only at multiplier ≈ 500. At multiplier = 500, sensitivity falls to ~15% for spike Δ = 0.20. | Sensitivity-driven confirmatory signal — penalised lightly on purpose, relies on ensemble agreement to keep FPR controlled. |
 
-### Why this matters
+The conservative-voting ensemble (≥ 2 of 3 methods must agree before a study is flagged for trimming) is the **load-bearing mechanism** for FPR control: no individual detector is calibrated for FPR < 0.05 *standalone*, but the ensemble exploits their complementary error modes. Lowering the changepoint multiplier in isolation will not break the pipeline, but it will erode the ensemble's specificity floor.
 
-The penalty multiplier and the consecutive-steps requirement together suppress noise-driven changepoints; lowering them is the most common way users accidentally over-flag studies. The `distance_cutoff_threshold` of 0.15 was set to be just sensitive enough to catch ecologically meaningful Bray–Curtis shifts without flagging stochastic noise at the read-depth tail. Halving it (to 0.075) is roughly equivalent to doubling the rejection rate.
+### Why the changepoint multiplier looks "wrong"
+
+The change-point penalty in `params.yaml` is 50 — orders of magnitude below the ~500 needed to control PELT's FPR by itself. This is **deliberate**. Calibration showed that at multiplier = 500 the changepoint method retains only ~15% sensitivity for moderate community shifts (Δ-Bray-Curtis = 0.20), which would defeat its purpose as an early-warning signal. The current value keeps it sensitive at the cost of standalone specificity, and the ≥ 2-methods-agree rule provides the FPR control that the penalty alone cannot.
 
 ### If you change a default
 
 You must do two things:
 
-1. **Document it.** Record the change in your methods section, alongside the rationale and ideally a sensitivity analysis (re-run with the published default for comparison).
-2. **Save the provenance file.** `output/final_outputs/provenance/params_used.yaml` records every effective parameter for the run — keep it with your manuscript supplementary material so reviewers can reproduce your call set.
+1. **Document it.** Record the change in your methods section alongside the rationale, ideally with a sensitivity analysis (re-run with the published default for comparison).
+2. **Keep the provenance file.** `output/final_outputs/provenance/params_used.yaml` records every effective parameter for the run — supply it as supplementary material so reviewers can reproduce your call set.
 
-### When to deviate
+### When deviation is defensible
 
-Three legitimate reasons to override defaults:
+- **Under-powered datasets** (< 5 studies, < 30 samples per study). The null model's near-zero standalone sensitivity becomes a problem when the ensemble is degraded by missing votes — consider relaxing to `null_model_min_consecutive = 2` and raising `null_model_p_threshold` to 0.10. The DistCutoff remains the safety net.
+- **Strongly heterogeneous primer sets** (e.g. V1–V3 + V4 + V6–V8 in one analysis). Reducing study count from the consensus calculation is often more defensible than relaxing the detectors — but if you need to retain studies, `distance_cutoff_threshold = 0.20` admits ~10–15 more studies in our test set without crossing FPR = 0.05.
+- **Publication-quality runs.** Increase `num_simulations` from 100 to 500 to tighten the null distribution; this does *not* change the calibrated penalty multiplier (the multiplier scales against data variance, not simulation count).
 
-- **Underpowered datasets** (<5 studies, <30 samples per study) — consider increasing `null_model_min_consecutive` to 5 to suppress small-sample noise.
-- **Strongly heterogeneous primer sets** (V1–V3 + V4 + V6–V8 in one analysis) — relaxing `distance_cutoff_threshold` to 0.20 may be needed to retain enough studies for a viable consensus.
-- **Publication-quality runs** — increase `num_simulations` to 500 to tighten p-value estimates. The changepoint penalty multiplier should then be re-tuned (it scales with `num_simulations`); a starting point is `changepoint_penalty_multiplier ≈ 5` at 500 simulations.
-
-For anything else, the defaults represent the most defensible starting point.
+For anything else, the defaults represent the most defensible starting point and were tuned specifically for the seagrass 16S meta-analysis benchmark set. See `Manuscripts/SeCAT/` (in-prep manuscript) for the full calibration methodology.
 
 ---
 
