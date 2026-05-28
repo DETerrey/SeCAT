@@ -435,6 +435,27 @@ process.container = '/absolute/path/to/secat_latest.sif'
 
 **`STANDARDIZE` complains it cannot find `output/intermediate/`** — the cleanup step deleted it. Set `keep_intermediates: true` and re-launch from the beginning, or run STANDARDIZE in the same Nextflow invocation as the verdict step (`auto_trim: true`).
 
+**Nextflow exits silently after the version banner, or `-resume` fails with a misleading error** (e.g. "--manifest is required" when your `params.yaml` clearly sets it). Symptom: you launch the pipeline, get the `Nextflow ~ version 25.x.x` line, then the shell prompt returns immediately with no SeCAT banner, no errors, no SLURM jobs submitted. Cause: a corrupted Nextflow cache, usually from an earlier `^C`'d or SIGHUP'd run that left the `.nextflow/history` and `.nextflow/cache/` in an inconsistent state. Recovery:
+
+```bash
+# Nuke the Nextflow runtime state (NOT your output directory):
+rm -rf ~/SeCAT/.nextflow/
+
+# Re-launch WITHOUT -resume so Nextflow rebuilds its history from scratch:
+nextflow run main.nf \
+    -profile slurm,singularity \
+    -c conf/jasmin.config \
+    -params-file params.yaml
+# (add -entry STANDARDIZE if you're past the verdict step)
+```
+
+What's safe to delete and what isn't:
+
+- **Safe to delete**: `~/SeCAT/.nextflow/` (Nextflow runtime cache — re-created on every launch).
+- **DO NOT delete**: `output/` (your actual results) or `/work/scratch-nopw2/<user>/secat_work/` (the per-task work directories — Nextflow can still pick these up as cached even without `.nextflow/history`).
+
+After `rm -rf .nextflow/`, the first run won't be able to `-resume` (no history yet), so omit the flag. From the *next* run onwards, `-resume` works normally because Nextflow rebuilds its history as it goes. You haven't lost any actual data — only Nextflow's bookkeeping.
+
 > **JASMIN-specific troubleshooting**
 >
 > - **Jobs pending forever**: check the `--account=` flag in `conf/jasmin.config`. The default `--account=no-project` works for unattached users; for project allocations, change it to your project code.
