@@ -2,6 +2,8 @@ process ANALYSE_REAL {
     tag "${study_name}"
     label 'mem_64g'
     publishDir "${params.outdir}/real_data_results/${study_name}", mode: 'copy', pattern: "*_results.rds"
+    // Per-study results.rds also published to per_study_data/ for user interpretation
+    publishDir "${params.final_outputs}/${params.final_outputs_per_study_dir}/results_rds", mode: 'copy', pattern: "*_results.rds"
 
     input:
         tuple val(task_id), val(study_name), val(manifest_row), path(aligned_fasta)

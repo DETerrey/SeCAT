@@ -4,6 +4,9 @@ process STUDY_MAPPING {
     publishDir "${params.outdir}/intermediate/study_mapping_parts", mode: 'copy', pattern: "mapping_part_*.csv"
     publishDir "${params.outdir}/intermediate/asv_coordinates",     mode: 'copy', pattern: "*_coords.csv"
     publishDir "${params.outdir}/intermediate/aligned_fastas",      mode: 'copy', pattern: "*_aligned.fasta"
+    // Aligned FASTAs also go to per_study_data/ so users can re-trim or do phylogenetic work
+    publishDir "${params.final_outputs}/${params.final_outputs_per_study_dir}/aligned_fastas", mode: 'copy', pattern: "*_aligned.fasta"
+    publishDir "${params.final_outputs}/${params.final_outputs_per_study_dir}/asv_coordinates", mode: 'copy', pattern: "*_coords.csv"
 
     input:
     tuple val(task_id), val(study_name), val(manifest_row)

@@ -2,6 +2,9 @@ process COLLECT_MAPS {
     tag "collecting ${mapping_parts.size()} studies"
     label 'mem_4g'
     publishDir "${params.outdir}/intermediate", mode: 'copy'
+    // Per-study coordinates also exposed in final_outputs for user interpretation
+    publishDir "${params.final_outputs}/${params.final_outputs_coordinates_dir}", mode: 'copy', pattern: "study_alignment_coords.csv"
+    publishDir "${params.final_outputs}/${params.final_outputs_coordinates_dir}", mode: 'copy', pattern: "study_mapping_summary.csv"
 
     input:
     path mapping_parts

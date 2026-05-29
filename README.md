@@ -278,6 +278,17 @@ output/final_outputs/
 │   ├── pre_consensus/                     # tables BEFORE consensus trimming
 │   └── post_consensus/                    # tables AFTER consensus trimming
 │       (kept for full transparency / supplementary methods)
+├── coordinates/
+│   ├── study_alignment_coords.csv         # per-study amplicon start/end on SILVA
+│   ├── consensusregioninfo.csv            # global consensus + included/excluded studies
+│   └── study_mapping_summary.csv          # study clique-detection metadata
+├── per_study_data/
+│   ├── results_rds/<study>_results.rds    # full per-study analysis (load in R)
+│   ├── aligned_fastas/<study>_aligned.fasta  # DECIPHER-anchored sequences
+│   └── asv_coordinates/<study>_coords.csv # per-ASV reference coordinates
+├── taxon_impact/
+│   ├── <study>__<field>.csv               # flat per-taxon CSVs extracted from .rds
+│   └── README.txt                         # what each field means
 └── provenance/
     ├── params_used.yaml                   # every effective parameter for this run
     ├── manifest_input.tsv                 # the manifest you provided, copied verbatim
