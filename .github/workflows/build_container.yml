@@ -35,13 +35,17 @@ jobs:
       - name: Determine image tags
         id: tags
         run: |
-          TAGS="ghcr.io/derbydt/secat:latest"
+          # Lowercase the repo owner so the resulting tag survives any future
+          # username changes without manual editing (GHCR requires lowercase).
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          TAGS="ghcr.io/${OWNER_LC}/secat:latest"
           if [ "${{ github.event_name }}" == "release" ]; then
             VERSION="${{ github.event.release.tag_name }}"
             VERSION="${VERSION#v}"
-            TAGS="$TAGS,ghcr.io/derbydt/secat:${VERSION}"
+            TAGS="$TAGS,ghcr.io/${OWNER_LC}/secat:${VERSION}"
           fi
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "owner_lc=$OWNER_LC" >> $GITHUB_OUTPUT
           echo "Building with tags: $TAGS"
 
       - name: Build and push Docker image to GHCR
@@ -58,7 +62,7 @@ jobs:
 
       - name: Verify image
         run: |
-          docker pull ghcr.io/derbydt/secat:latest
-          docker run --rm ghcr.io/derbydt/secat:latest \
+          docker pull ghcr.io/${{ steps.tags.outputs.owner_lc }}/secat:latest
+          docker run --rm ghcr.io/${{ steps.tags.outputs.owner_lc }}/secat:latest \
               Rscript -e "cat('R OK\n'); library(DECIPHER); library(vegan); cat('Packages OK\n')"
-          docker run --rm ghcr.io/derbydt/secat:latest vsearch --version
+          docker run --rm ghcr.io/${{ steps.tags.outputs.owner_lc }}/secat:latest vsearch --version

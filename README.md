@@ -130,7 +130,7 @@ nextflow -version       # confirm install
 - **On an HPC** you almost certainly need **Singularity** (it does not require root, unlike Docker). On JASMIN it is available system-wide — no install needed. Just run `singularity --version` to confirm.
 - **On a laptop or cloud VM** use **Docker Desktop** (or `apt install docker.io` on Ubuntu).
 
-You do **not** need to build any container yourself. SeCAT pulls a pre-built one from GitHub Container Registry (`ghcr.io/derbydt/secat:latest`) on first launch, ~10 minutes.
+You do **not** need to build any container yourself. SeCAT pulls a pre-built one from GitHub Container Registry (`ghcr.io/deterrey/secat:latest`) on first launch, ~10 minutes.
 
 ### 3. The SeCAT pipeline itself
 
@@ -428,7 +428,7 @@ Total wall time on JASMIN LOTUS2: typically **12–24 hours** end-to-end. Most o
 
 **Container pull fails (`Failed to pull singularity image`)** — your compute nodes have no outbound HTTPS access (common on secure clusters). Pre-pull the container from the login node and point Nextflow at the local image:
 ```bash
-singularity pull docker://ghcr.io/derbydt/secat:latest
+singularity pull docker://ghcr.io/deterrey/secat:latest
 # then in your site config:
 process.container = '/absolute/path/to/secat_latest.sif'
 ```
