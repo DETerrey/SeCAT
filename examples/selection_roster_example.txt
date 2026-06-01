@@ -1,0 +1,30 @@
+# ==============================================================================
+# selection_roster_example.txt — studies to include in the trim/merge step
+#
+# Usage:
+#   1. After the first run (which pauses after generating verdicts), open:
+#        output/final_outputs/verdicts/verdict_data_all_levels.csv
+#      Each row is a study × taxonomic-level verdict (KEEP / EXCLUDE).
+#   2. Copy the names of every study you want to include into this file,
+#      one per line. Names are case-sensitive and must exactly match the
+#      study_name column in your manifest.
+#   3. Set in your params.yaml:
+#        selection_mode: "roster"
+#        selection_file: "/absolute/path/to/this/file"
+#   4. Re-launch with the STANDARDIZE entry to complete trimming + merging:
+#        nextflow run main.nf \
+#            -profile slurm,singularity \
+#            -params-file params.yaml \
+#            -entry STANDARDIZE -resume
+#
+# Notes:
+#   - Lines starting with # are comments (this whole header is ignored).
+#   - Blank lines are ignored.
+#   - A study listed here that has no KEEP verdict will be skipped with a warning.
+#   - To run with every KEEP-verdict study without curation, set
+#     selection_mode: "auto" in params.yaml and ignore this file.
+# ==============================================================================
+
+# Example — replace with your own study names from the verdict table.
+Study_A
+Study_B

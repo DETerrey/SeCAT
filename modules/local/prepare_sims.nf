@@ -3,6 +3,8 @@ process PREPARE_SIMS {
     cache 'lenient'
     label 'mem_4g'
     publishDir "${params.outdir}/intermediate", mode: 'copy'
+    // Consensus region info goes to final_outputs/coordinates/ for user interpretation
+    publishDir "${params.final_outputs}/${params.final_outputs_coordinates_dir}", mode: 'copy', pattern: "consensusregioninfo.csv"
 
     input:
     path study_coords

@@ -15,6 +15,7 @@ include { ANALYSE_REAL        } from './modules/local/analyse_real'
 include { AGGREGATE           } from './modules/local/aggregate'
 include { GENERATE_VERDICTS   } from './modules/local/generate_verdicts'
 include { GENERATE_REPORT     } from './modules/local/generate_report'
+include { EXTRACT_TAXON_IMPACT } from './modules/local/extract_taxon_impact'
 include { TRIM_SEQUENCES    } from './modules/local/trim_sequences'
 include { MERGE_DATASETS      } from './modules/local/merge_datasets'
 include { VALIDATE            } from './modules/local/validate'
@@ -177,6 +178,8 @@ workflow {
         collected_coords,
         PREPARE_SIMS.out.consensus_info
     )
+
+    EXTRACT_TAXON_IMPACT(all_real_results_ch)
 
     GENERATE_VERDICTS(AGGREGATE.out.master_verdict_table)
 

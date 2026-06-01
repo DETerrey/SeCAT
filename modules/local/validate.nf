@@ -2,6 +2,9 @@ process VALIDATE {
     tag "validation (multi-tier)"
     label 'mem_30g'
     publishDir "${params.outdir}/validation", mode: 'copy'
+    // Duplicate verification stats into final_outputs/verification/
+    publishDir "${params.final_outputs}/${params.final_outputs_verification_dir}", mode: 'copy', pattern: "outputs/**",          saveAs: { f -> f.replaceFirst('^outputs/', '') }
+    publishDir "${params.final_outputs}/${params.final_outputs_verification_dir}", mode: 'copy', pattern: "logs/validation.log"
 
 input:
     path post_otu,    stageAs: 'post_feature_table.tsv'
