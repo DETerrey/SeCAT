@@ -99,7 +99,7 @@ With those six answers you can populate `conf/custom.config` (described in [Site
 
 You need three pieces of software on the machine from which you will launch the pipeline (typically the HPC login node):
 
-### 1. Nextflow (>= 23.04)
+### 1. Nextflow (>= 25.10; 26.04 recommended)
 
 Nextflow needs Java 11 or later. How you make it available depends on your site:
 
@@ -175,6 +175,25 @@ The script verifies that all paths listed in your manifest exist and are readabl
 See `examples/README.md` for the format requirements of each input file (feature table, taxonomy, FASTA, metadata).
 
 ---
+
+## Container bind paths (Nextflow 26+)
+
+SeCAT runs every step inside a Singularity/Docker container, which can only see
+host folders explicitly mounted into it. Tell SeCAT where your data lives with
+the `bind_paths` parameter in `params.yaml`:
+
+```yaml
+bind_paths: "/path/to/your/data"     # folder(s) with study files, metadata, reference_db
+```
+
+Point it at the folder(s) containing the paths in your manifest plus your
+`reference_db`. One folder for everything? name it. Scattered? comma-separate
+the roots (`"/data/studies,/refs/silva"`).
+
+**Why:** Nextflow 26 enabled the strict config parser by default, which can no
+longer auto-derive these paths from the manifest and does not pass
+`SINGULARITY_BIND` through to cluster jobs. `bind_paths` puts the mounts on the
+container command line — works on Nextflow 25 and 26.
 
 ## Running SeCAT
 

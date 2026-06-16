@@ -28,7 +28,7 @@
 # taxonomy path, and metadata path.
 # Valid values: absolute path to a correctly formatted SeCAT manifest.
 # Data impact: defines the entire study set entering the pipeline.
-manifest:     "/home/users/dterrey/secat_data/secat_manifest_jasmin.tsv"
+manifest:     "/home/users/dterrey/SeCAT_AlessiaTest/SeCAT/secat_manifest.tsv"
 
 # Path to the SILVA reference alignment (full-length, aligned, truncated FASTA).
 # Must be the NR99 (non-redundant 99%) version for consistent coordinate mapping.
@@ -36,6 +36,14 @@ manifest:     "/home/users/dterrey/secat_data/secat_manifest_jasmin.tsv"
 # Data impact: all trimming positions are defined in SILVA alignment coordinates.
 #   Changing the reference version invalidates previously computed consensus regions.
 reference_db: "/home/users/dterrey/secat_data/references/SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta"
+
+# ── Container bind paths (required for Nextflow 26+) ─────────────────────────
+# Folder(s) on the host that hold your input data: the directories containing
+# the study files in your manifest, the metadata, and the reference_db above.
+# Mounted into the Singularity/Docker container so it can read them.
+#   bind_paths: "/data/my_project"              # one folder holds everything
+#   bind_paths: "/data/studies,/refs/silva"     # data in several places
+bind_paths: "/home/users/dterrey/secat_data"
 
 # ==============================================================================
 # OUTPUT DIRECTORY
@@ -433,3 +441,4 @@ auto_trim:      false
 # Data impact: more levels give a multi-resolution view of harmonisation
 #   quality but increase validation runtime.
 validation_levels: "ASV,Genus,Family"   
+
