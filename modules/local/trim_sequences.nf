@@ -1,10 +1,10 @@
 process TRIM_SEQUENCES {
     tag "trimming sequences"
     label 'mem_16g'
-    publishDir "${params.outdir}/standardized_datasets", mode: 'copy', pattern: "*_standardized.fasta"
-    publishDir "${params.outdir}/aggregated_data",       mode: 'copy', pattern: "trim_summary.csv"
+    publishDir(path: { "${params.outdir}/standardized_datasets" }, mode: 'copy', pattern: "*_standardized.fasta")
+    publishDir(path: { "${params.outdir}/aggregated_data" }, mode: 'copy', pattern: "trim_summary.csv")
     // Duplicate trim summary into final_outputs/verdicts/
-    publishDir "${params.final_outputs}/${params.final_outputs_verdicts_dir}", mode: 'copy', pattern: "trim_summary.csv"
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "trim_summary.csv")
     input:
     path selected_file
     path study_coords

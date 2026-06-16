@@ -1,7 +1,7 @@
 process CLEAN_DATA {
     tag "cleaning all studies"
     label 'mem_16g'
-    publishDir "${params.outdir}/cleaned_data", mode: 'copy'
+    publishDir(path: { "${params.outdir}/cleaned_data" }, mode: 'copy')
 
     input:
     path manifest

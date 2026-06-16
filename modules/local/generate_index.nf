@@ -1,7 +1,7 @@
 process GENERATE_INDEX {
     tag "generating HTML index"
     label 'mem_8g'
-    publishDir "${params.outdir}/reports", mode: 'copy', pattern: "*.html"
+    publishDir(path: { "${params.outdir}/reports" }, mode: 'copy', pattern: "*.html")
 
     input:
     path aggregated_dir

@@ -1,12 +1,12 @@
 process AGGREGATE {
     tag "aggregating all results"
     label 'mem_64g'
-    publishDir "${params.outdir}/aggregated_data", mode: 'copy', pattern: "aggregated_data/*"
+    publishDir(path: { "${params.outdir}/aggregated_data" }, mode: 'copy', pattern: "aggregated_data/*")
     // Duplicate user-facing verdict + stats tables into final_outputs/verdicts/
-    publishDir "${params.final_outputs}/${params.final_outputs_verdicts_dir}", mode: 'copy', pattern: "aggregated_data/master_verdict_table.csv",           saveAs: { f -> file(f).name }
-    publishDir "${params.final_outputs}/${params.final_outputs_verdicts_dir}", mode: 'copy', pattern: "aggregated_data/verdict_data_all_levels.csv",        saveAs: { f -> file(f).name }
-    publishDir "${params.final_outputs}/${params.final_outputs_verdicts_dir}", mode: 'copy', pattern: "aggregated_data/simulation_baseline_statistics.csv", saveAs: { f -> file(f).name }
-    publishDir "${params.final_outputs}/${params.final_outputs_verdicts_dir}", mode: 'copy', pattern: "aggregated_data/simulation_retention_curves.csv",    saveAs: { f -> file(f).name }
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "aggregated_data/master_verdict_table.csv",           saveAs: { f -> file(f).name })
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "aggregated_data/verdict_data_all_levels.csv",        saveAs: { f -> file(f).name })
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "aggregated_data/simulation_baseline_statistics.csv", saveAs: { f -> file(f).name })
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "aggregated_data/simulation_retention_curves.csv",    saveAs: { f -> file(f).name })
 
     input:
     path real_results

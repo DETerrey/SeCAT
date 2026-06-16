@@ -2,10 +2,10 @@ process GENERATE_VERDICTS {
     tag "generating verdicts"
     cache 'lenient'
     label 'mem_4g'
-    publishDir "${params.outdir}/aggregated_data", mode: 'copy'
+    publishDir(path: { "${params.outdir}/aggregated_data" }, mode: 'copy')
     // Duplicate final verdicts into final_outputs/verdicts/
-    publishDir "${params.final_outputs}/${params.final_outputs_verdicts_dir}", mode: 'copy', pattern: "verdict_data_all_levels.csv"
-    publishDir "${params.final_outputs}/${params.final_outputs_verdicts_dir}", mode: 'copy', pattern: "final_trim_verdicts.csv"
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "verdict_data_all_levels.csv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "final_trim_verdicts.csv")
 
     input:
     path master_verdict_table

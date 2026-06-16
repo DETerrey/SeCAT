@@ -1,7 +1,7 @@
 process PRIMER_MAPPING {
     tag "primer coordinate mapping"
     label 'mem_64g'
-    publishDir "${params.outdir}/intermediate", mode: 'copy'
+    publishDir(path: { "${params.outdir}/intermediate" }, mode: 'copy')
 
     input:
     path reference_db
@@ -26,7 +26,7 @@ process PRIMER_MAPPING {
 process GENERATE_PRIMER_DBS {
     tag "${primer_name}"
     label 'mem_16g'
-    publishDir "${params.outdir}/primer_databases", mode: 'copy', pattern: "db_*.fasta"
+    publishDir(path: { "${params.outdir}/primer_databases" }, mode: 'copy', pattern: "db_*.fasta")
 
     input:
     tuple val(primer_name), path(reference_db)

@@ -2,7 +2,7 @@ process RUN_SIMULATION {
     tag "${task_id}__seed_${seed}"
     cache 'lenient'
     label 'mem_18g'
-    publishDir "${params.outdir}/simulation_results/${task_id}/seed_${seed}", mode: 'copy', pattern: "results.rds"
+    publishDir(path: { "${params.outdir}/simulation_results/${task_id}/seed_${seed}" }, mode: 'copy', pattern: "results.rds")
 
     input:
     tuple val(task_id), val(seed), val(num_steps), val(amplicon_length)
