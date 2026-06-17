@@ -23,6 +23,12 @@ include { PRIMER_MAPPING      } from './modules/local/primer_mapping'
 include { GENERATE_PRIMER_DBS } from './modules/local/primer_mapping'
 
 workflow {
+    // Nextflow 26: -entry removed; dispatch named workflows via --step
+    if( params.step == 'standardize' ) {
+        STANDARDIZE()
+    }
+    else {
+
 
     // ── Preflight checks — validate all paths before submitting any jobs ──────
     if (!params.manifest) {
@@ -222,9 +228,11 @@ workflow {
         ============================================================
         Pipeline complete. Review verdicts then run:
           Rscript R/11_select_studies.R
-          nextflow run main.nf --entry STANDARDIZE -resume
+          nextflow run main.nf --step standardize -resume
         ============================================================
         """.stripIndent()
+    }
+
     }
 }
 

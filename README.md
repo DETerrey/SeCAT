@@ -329,13 +329,13 @@ The review loop is:
 2. Open `output/final_outputs/reports/master_summary_report.pdf` and the per-study PDFs.
 3. Look at `output/final_outputs/verdicts/verdict_data_all_levels.csv` — each row is a study × taxonomic level with a KEEP/EXCLUDE verdict.
 4. Edit `selection_roster.txt` to list the studies you want in the final merged dataset.
-5. Re-launch with `-entry STANDARDIZE -resume`:
+5. Re-launch with `--step standardize -resume`:
    ```bash
    nextflow run main.nf \
        -profile slurm,singularity \
        -c conf/jasmin.config \
        -params-file params.yaml \
-       -entry STANDARDIZE -resume
+       --step standardize -resume
    ```
 
 `STANDARDIZE` reads the existing intermediates (which is why cleanup is deferred until after a successful STANDARDIZE run), runs trimming + merging + validation, and writes the final results.
@@ -476,7 +476,7 @@ nextflow run main.nf \
     -profile slurm,singularity \
     -c conf/jasmin.config \
     -params-file params.yaml
-# (add -entry STANDARDIZE if you're past the verdict step)
+# (add --step standardize if you're past the verdict step)
 ```
 
 What's safe to delete and what isn't:
