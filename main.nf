@@ -19,8 +19,6 @@ include { EXTRACT_TAXON_IMPACT } from './modules/local/extract_taxon_impact'
 include { TRIM_SEQUENCES    } from './modules/local/trim_sequences'
 include { MERGE_DATASETS      } from './modules/local/merge_datasets'
 include { VALIDATE            } from './modules/local/validate'
-include { PRIMER_MAPPING      } from './modules/local/primer_mapping'
-include { GENERATE_PRIMER_DBS } from './modules/local/primer_mapping'
 
 workflow {
     // Nextflow 26: -entry removed; dispatch named workflows via --step
@@ -128,21 +126,8 @@ workflow {
         collected_coords = COLLECT_MAPS.out.study_coords.first()
         collected_maps   = COLLECT_MAPS.out.collected_maps.first()
 
-    } else if (params.analysis_mode == 'primer') {
-
-        PRIMER_MAPPING(file(params.reference_db))
-
-        primer_coords_ch = PRIMER_MAPPING.out.primer_coords
-            .splitCsv(header: true)
-            .map { row -> tuple(row.primer_name, params.reference_db) }
-
-        GENERATE_PRIMER_DBS(primer_coords_ch)
-
-        collected_coords = PRIMER_MAPPING.out.primer_coords
-        collected_maps   = PRIMER_MAPPING.out.primer_coords
-
     } else {
-        error "ERROR: analysis_mode must be 'study' or 'primer', got: ${params.analysis_mode}"
+        error "ERROR: Only analysis_mode='study' is supported (legacy primer mode retired). Got: ${params.analysis_mode}"
     }
 
     PREPARE_SIMS(

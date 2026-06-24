@@ -1,3 +1,3 @@
-study_name	primer_name	fwd_seq	rev_seq	initial_fwd_trim	initial_rev_trim	asv_fasta_path	asv_counts_path	taxonomy_path	metadata_path	metadata_variable	metadata_value
-Study_A	515F_806R	GTGYCAGCMGCCGCGGTAA	GGACTACNVGGGTWTCTAAT	0	0	/absolute/path/to/Study_A/sequences.fasta	/absolute/path/to/Study_A/feature_table.tsv	/absolute/path/to/Study_A/taxonomy.tsv	/absolute/path/to/Study_A/metadata.tsv	HolobiontArea	Rhizosphere
-Study_B	341F_805R	CCTACGGGNGGCWGCAG	GACTACHVGGGTATCTAATCC	0	0	/absolute/path/to/Study_B/sequences.fasta	/absolute/path/to/Study_B/feature_table.tsv	/absolute/path/to/Study_B/taxonomy.tsv	/absolute/path/to/Study_B/metadata.tsv		
+study_name	primer_name	initial_fwd_trim	initial_rev_trim	asv_fasta_path	asv_counts_path	taxonomy_path	metadata_path	metadata_variable	metadata_value
+Study_A	515F_806R	0	0	/absolute/path/to/Study_A/sequences.fasta	/absolute/path/to/Study_A/feature_table.tsv	/absolute/path/to/Study_A/taxonomy.tsv	/absolute/path/to/Study_A/metadata.tsv	HolobiontArea	Rhizosphere
+Study_B	341F_805R	0	0	/absolute/path/to/Study_B/sequences.fasta	/absolute/path/to/Study_B/feature_table.tsv	/absolute/path/to/Study_B/taxonomy.tsv	/absolute/path/to/Study_B/metadata.tsv		
