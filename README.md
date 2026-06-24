@@ -314,8 +314,8 @@ By default (`auto_trim: false`), SeCAT runs the first half of the pipeline (clea
 The review loop is:
 
 1. Wait for the first run to finish (you'll see "Pipeline complete. Review verdicts then run:" in the log).
-2. Open `output/final_outputs/reports/master_summary_report.pdf` and the per-study PDFs.
-3. Look at `output/final_outputs/verdicts/verdict_data_all_levels.csv` — each row is a study × taxonomic level with a KEEP/EXCLUDE verdict.
+2. Open `output/final_outputs/1_report/MESAP_Master_Summary_Report.pdf` and the per-study PDFs.
+3. Look at `output/final_outputs/3_verdicts/verdict_data_all_levels.csv` — each row is a study × taxonomic level with a KEEP/EXCLUDE verdict.
 4. Edit `selection_roster.txt` to list the studies you want in the final merged dataset.
 5. Re-launch with `--step standardize -resume`:
    ```bash
