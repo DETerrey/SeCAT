@@ -268,7 +268,7 @@ DISTANCE_CUTOFF_MIN_TRIM_BP   <- .secat_env("SECAT_DISTANCE_CUTOFF_MIN_BP",  5, 
 
 # Plot resolution in dots per inch. Affects file size and print quality.
 # Valid values: positive integer (150-600; 300 = publication standard).
-PLOT_DPI                      <- .secat_env("SECAT_PLOT_DPI",                300,  "integer")
+PLOT_DPI                      <- .secat_env("SECAT_PLOT_DPI",                600,  "integer")
 
 # Force regeneration of all outputs, even if cached results exist.
 # Valid values: TRUE / FALSE.

@@ -341,7 +341,7 @@ get_first_degradation_method <- function(vdf) {
     if (status == "HARD_FAIL") {
       t_bc  <- if ("Threshold_Observed_BCCeiling" %in% names(vdf)) vdf$Threshold_Observed_BCCeiling[1] else NA_real_
       t_ret <- if ("Threshold_Observed_RetFloor"  %in% names(vdf)) vdf$Threshold_Observed_RetFloor[1]  else NA_real_
-      gates <- c(if (!is.na(t_bc))  "BC ceiling" else NULL,
+      gates <- c(if (!is.na(t_bc))  "Bray-Curtis ceiling" else NULL,
                  if (!is.na(t_ret)) "Retention floor" else NULL)
       return(sprintf("Hard fail — %s", paste(gates, collapse = " + ")))
     }
@@ -356,7 +356,7 @@ get_first_degradation_method <- function(vdf) {
       which_fired <- if (!is.na(t_cp))   "Changepoint"      else
                      if (!is.na(t_cut))  "Distance Cutoff"  else
                      if (!is.na(t_null)) "Null Model"        else
-                     if (!is.na(t_bc))   "BC Ceiling"        else
+                     if (!is.na(t_bc))   "Bray-Curtis Ceiling"        else
                      if (!is.na(t_ret))  "Retention Floor"   else "Unknown"
       n_total <- if (!is.na(n_trig) && n_trig > 0) n_trig else 5L
       return(sprintf("Warning — %s only (1/%d methods)", which_fired, n_total))
@@ -491,7 +491,7 @@ plot_dissimilarity_robust <- function(study_data,
     labs(
       title    = paste("A) Community Dissimilarity vs. Trimming (", taxonomic_level, ")", sep = ""),
       subtitle = subtitle_text,
-      x        = paste("Trim Step (1 step =", actual_increment, "bp)")
+      x        = paste("Trim Step (1 step =", actual_increment, "alignment columns)")
     )
 
   if (!is.null(verdict_df) && nrow(verdict_df) > 0) {
@@ -586,7 +586,7 @@ plot_retention_robust <- function(study_data,
     scale_x_continuous(limits = c(0, x_axis_max_steps), expand = expansion(mult = c(0, 0.02))) +
     labs(
       title    = paste("B) Taxon Retention vs. Trimming (", taxonomic_level, ")", sep = ""),
-      x        = paste("Trim Step (1 step =", actual_increment, "bp)")
+      x        = paste("Trim Step (1 step =", actual_increment, "alignment columns)")
     )
 
   if (!is.null(verdict_df) && nrow(verdict_df) > 0) {
@@ -679,7 +679,7 @@ plot_taxon_impact_combined <- function(study_data,
     facet_wrap(~Taxon, scales = "free_y", ncol = 5) +
     labs(
       title = "Taxa with the largest change in relative abundance",
-      x     = paste("Trim Step (1 step =", actual_increment, "bp)"),
+      x     = paste("Trim Step (1 step =", actual_increment, "alignment columns)"),
       y     = "Mean Relative Abundance"
     ) +
     scale_x_continuous(limits = c(0, x_axis_max_steps), expand = expansion(mult = c(0, 0.02))) +
@@ -839,7 +839,7 @@ plot_core_taxa_robust <- function(study_data,
     labs(
       title = paste("D) Core", taxonomic_level, "s"),
       subtitle = paste0("Top ", n_taxa_to_plot, " abundant taxa (prevalence-filtered)"),
-      x = paste("Trim Step (1 step =", actual_increment, "bp)"),
+      x = paste("Trim Step (1 step =", actual_increment, "alignment columns)"),
       y = "Mean Relative Abundance"
     ) +
     theme_bw() + theme(legend.position = "none", strip.text = element_text(size = 8))
@@ -985,7 +985,7 @@ create_study_specific_practical_guide <- function(study_data, verdict_df) {
                        StatusSymbol,
                        Status,
                        ifelse(is.na(First_Threshold), "No degr.", 
-                              sprintf("Degr: %4.0f bp", First_Threshold))
+                              sprintf("Degr: %4.0f col", First_Threshold))
       )
     ) %>%
     pull(Display) %>%
@@ -1023,7 +1023,7 @@ create_study_specific_practical_guide <- function(study_data, verdict_df) {
             n_pass, n_marginal, n_fail, n_total),
     "",
     if (!is.na(target_trim) && target_trim > 0) {
-      sprintf("  Target trim: %d bp", target_trim)
+      sprintf("  Target trim: %d col", target_trim)
     } else {
       ""
     },
@@ -1376,7 +1376,8 @@ Is_Warning_Only = !is.na(Consensus_Status) & Consensus_Status == "WARNING_SINGLE
 
     COL_OUT   <- "Outside consensus"
     COL_GREEN <- "Safe - within consensus"
-    COL_WARN  <- "Caution (1-method warning)"
+    COL_WARN  <- "Caution - single-method flag (overhang)"
+    COL_WARN_INSIDE <- "Passed - flagged inside consensus"
     COL_RED   <- "Degraded (confirmed)"
     COL_GREY  <- "Outlier (Excluded)"
 
@@ -1429,7 +1430,13 @@ Is_Warning_Only = !is.na(Consensus_Status) & Consensus_Status == "WARNING_SINGLE
         R_in_cons <- !is.na(dg_R_inner) && dg_R_inner > cs && dg_R_inner < ce
 
         # Choose degradation colour
-        col_dg <- if (is_warning_only) COL_WARN else COL_RED
+        col_dg <- if (L_in_cons || R_in_cons) {
+            COL_WARN_INSIDE   # inside consensus -> passes (single or hard fail)
+        } else if (is_warning_only) {
+            COL_WARN          # single-method flag, overhang only
+        } else {
+            COL_RED           # degradation compromises the consensus
+        }
 
         if (!L_in_cons && !R_in_cons) {
             # ── DEGRADATION ENTIRELY IN OVERHANG(S) ──────────────────────
@@ -1561,8 +1568,9 @@ Is_Warning_Only = !is.na(Consensus_Status) & Consensus_Status == "WARNING_SINGLE
             name = "Segment Type",
             values = c(
                 "Safe - within consensus"    = "#27ae60",   # green
+                "Passed - flagged inside consensus" = "#1E8449",   # dark green
                 "Outside consensus"          = "#f5cba7",   # light orange
-                "Caution (1-method warning)" = "#e67e22",   # dark orange
+                "Caution - single-method flag (overhang)" = "#e67e22",   # orange
                 "Degraded (confirmed)"       = "#e74c3c",   # red
                 "Outlier (Excluded)"         = "#95a5a6"    # grey
             ),
@@ -1951,7 +1959,7 @@ create_method_performance_plot <- function() {
             title = "Detection Method Performance Comparison",
             subtitle = "Median degradation threshold detected by each method per taxonomic level",
             x = "Taxonomic Level",
-            y = "Median Degradation Threshold (bp)"
+            y = "Median Degradation Threshold (alignment column)"
         ) +
         ggplot2::theme_minimal() +
         ggplot2::theme(
@@ -2361,14 +2369,7 @@ tryCatch({
         }
     }
 
-    # Generate Forest Plot
-    message("  -> Generating trimming recommendations...")
-    master_plots_list$recommendations <- tryCatch({
-        create_trimming_recommendations()
-    }, error = function(e) {
-        message(paste("    [WARN] Error creating recommendations:", conditionMessage(e)))
-        NULL
-    })
+    # Safe-trim recommendations forest plot removed (non-functional; superseded by review)
 
     # Generate Cheat Sheet
     message("  -> Generating practical guide...")
