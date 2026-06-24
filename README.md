@@ -266,58 +266,46 @@ Most HPCs allow login nodes to host long-running shell sessions like `tmux` inde
 
 ## Understanding the output folder
 
-After a **successful full run** (`auto_trim: true`, or after STANDARDIZE), the only folder you need is `output/final_outputs/`:
+After a **successful full run** (`auto_trim: true`, or after STANDARDIZE), everything you need is under `output/final_outputs/`. Start with the generated `README.txt`, then `1_report/`:
 
 ```
 output/final_outputs/
-├── tables/
-│   ├── combined_feature_table.tsv         # ← the merged ASV table — feed to phyloseq / qiime2 / vegan
-│   ├── combined_taxonomy.tsv
-│   ├── combined_metadata.tsv
-│   ├── combined_sequences.fasta
-│   └── asv_mapping_final.tsv              # crosswalk: original ASV → harmonised ASV
-├── verdicts/
-│   ├── master_verdict_table.csv           # per study × level: KEEP / EXCLUDE
-│   ├── verdict_data_all_levels.csv        # full diagnostic table behind the verdicts
-│   ├── final_trim_verdicts.csv            # per-study trim coordinates applied
-│   ├── trim_summary.csv                   # bp trimmed from 5'/3' per study
-│   ├── simulation_baseline_statistics.csv # null-model summary stats
-│   └── simulation_retention_curves.csv    # null-model degradation curves
-├── reports/
-│   ├── master_summary_report.pdf          # headline diagnostic — open this first
-│   └── <study>_report.pdf                 # per-study trim diagnostic, one per study
-├── plots/
-│   └── <study>_*.png / .pdf               # individual diagnostic plots
-├── verification/
-│   ├── tier_*_alpha_diversity_*.tsv       # alpha-diversity comparison pre vs post trim
-│   ├── tier_*_beta_diversity_*.tsv        # beta-diversity comparison
-│   ├── tier_*_taxonomic_composition_*.tsv # taxonomic agreement
-│   └── validation.log
-├── comparison/
-│   ├── pre_consensus/                     # tables BEFORE consensus trimming
-│   └── post_consensus/                    # tables AFTER consensus trimming
-│       (kept for full transparency / supplementary methods)
-├── coordinates/
-│   ├── study_alignment_coords.csv         # per-study amplicon start/end on SILVA
-│   ├── consensusregioninfo.csv            # global consensus + included/excluded studies
-│   └── study_mapping_summary.csv          # study clique-detection metadata
-├── per_study_data/
-│   ├── results_rds/<study>_results.rds    # full per-study analysis (load in R)
-│   ├── aligned_fastas/<study>_aligned.fasta  # DECIPHER-anchored sequences
-│   └── asv_coordinates/<study>_coords.csv # per-ASV reference coordinates
-├── taxon_impact/
-│   ├── <study>__<field>.csv               # flat per-taxon CSVs extracted from .rds
-│   └── README.txt                         # what each field means
-└── provenance/
-    ├── params_used.yaml                   # every effective parameter for this run
-    ├── manifest_input.tsv                 # the manifest you provided, copied verbatim
-    ├── secat_manifest_clean.tsv           # the cleaned manifest SeCAT actually used
-    └── selection_roster.txt               # which studies were included in the merge
+  README.txt                            # START HERE - index to everything below
+  1_report/                             # read this first
+    MESAP_Master_Summary_Report.pdf     # <- headline diagnostic - open this first
+    per_study/<study>_report.pdf        # per-study trim diagnostic, one per study
+    figures/                            # report pages as PNGs (master/ + per_study/<study>/)
+    run_diagnostics/                    # nextflow_report.html / timeline.html / dag.html
+  2_dataset/                            # merged, trimmed dataset for downstream analysis
+    combined_feature_table.tsv          # <- merged ASV table - feed to phyloseq / qiime2 / vegan
+    combined_taxonomy.tsv
+    combined_metadata.tsv
+    combined_sequences.fasta
+    asv_mapping_final.tsv               # crosswalk: original ASV -> harmonised ASV
+  3_verdicts/                           # per-study keep/trim decisions
+    master_verdict_table.csv            # per study x level: KEEP / EXCLUDE
+    verdict_data_all_levels.csv         # diagnostic table behind the verdicts
+    final_trim_verdicts.csv             # per-study trim coordinates applied
+    trim_summary.csv                    # bp trimmed from 5'/3' per study
+    simulation_baseline_statistics.csv  # null-model summary stats
+    simulation_retention_curves.csv     # null-model degradation curves
+  4_verification/                       # did trimming preserve the biology? plots + stats per level
+    validation_summary.csv
+    asv/  genus/  family/               # each level: diagnostic PDFs + permanova/network/concordance together
+    logs/validation.log
+  5_comparison/                         # transparency: pre- vs post-consensus tables
+    pre_consensus/
+    post_consensus/
+  supporting/                           # provenance + dig-deeper material
+    provenance/                         # params_used.yaml, manifest copies, selection_roster.txt
+    coordinates/                        # per-study SILVA windows + global consensus region
+    per_study_data/                     # per-study .rds, aligned FASTAs, ASV coords, standardized_fastas/
+    taxon_impact/                       # flattened per-taxon CSVs (+ README.txt for the fields)
 ```
 
-The intermediate folders (`cleaned_data/`, `intermediate/`, `real_data_results/`, `simulation_results/`, `meta_analysis/`, `standardized_datasets/`, `validation/`) are **deleted automatically at end of run** unless `keep_intermediates: true`. The Nextflow `work/` cache is always preserved so `-resume` still works.
+Folders are numbered in the order you'll usually want them: the write-up (`1_report/`), the data for analysis (`2_dataset/`), the decisions (`3_verdicts/`), the evidence (`4_verification/`), then transparency and supporting material. Nextflow's HTML run diagnostics are written straight into `1_report/run_diagnostics/`.
 
----
+The working `output/` tree also holds intermediate folders (`cleaned_data/`, `intermediate/`, `real_data_results/`, `simulation_results/`, `meta_analysis/`, `standardized_datasets/`, `validation/`, `reports/`) - these are **deleted at end of run** unless `keep_intermediates: true`. Everything a user needs is mirrored into `final_outputs/` first, and the Nextflow `work/` cache is always preserved so `-resume` still works.
 
 ## The manual-review pause and the STANDARDIZE step
 
