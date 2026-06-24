@@ -47,7 +47,7 @@ check_file_exists "Manifest file" "secat_manifest.tsv"
 if [ -f "secat_manifest.tsv" ]; then
     echo "  -> Validating paths in manifest..."
     # Quick check using awk to verify files exist
-    awk -F'\t' 'NR>1 {if(system("[ -f " $4 " ]") != 0) print "Missing ASV file: " $4}' secat_manifest.tsv
+    awk -F'\t' 'NR==1{for(i=1;i<=NF;i++)c[$i]=i;next}{split("asv_fasta_path asv_counts_path taxonomy_path metadata_path",P," ");for(k in P){col=P[k];if(col in c){p=$(c[col]);if(p!="" && system("[ -f " p " ]")!=0)print "    Missing " col " for " $(c["study_name"]) ": " p}}}' secat_manifest.tsv
 fi
 
 # --- Step 2: Intermediate Files ---
