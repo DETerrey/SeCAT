@@ -263,7 +263,7 @@ TAXONOMIC_LEVELS <- {
 }
 
 OUTPUT_DIR     <- file.path(BASE_DIR, "outputs")
-PLOTS_DIR      <- file.path(OUTPUT_DIR, "figures")
+PLOTS_DIR      <- OUTPUT_DIR  # plots written alongside their CSVs, per level (no separate figures/ tree)
 CHECKPOINT_DIR <- file.path(OUTPUT_DIR, "checkpoints")
 
 dir.create(OUTPUT_DIR,     recursive = TRUE, showWarnings = FALSE)

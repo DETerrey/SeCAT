@@ -1,11 +1,10 @@
 process GENERATE_REPORT {
     tag "generating PDF report"
     label 'mem_64g_cpu4'
-    publishDir(path: { "${params.outdir}/reports" }, mode: 'copy', pattern: "*.pdf")
-    publishDir(path: { "${params.outdir}/final_plots" }, mode: 'copy', pattern: "final_plots/**")
-    // Duplicate user-facing PDFs and plots into final_outputs/
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_reports_dir}" }, mode: 'copy', pattern: "*.pdf")
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_plots_dir}" }, mode: 'copy', pattern: "final_plots/**", saveAs: { f -> f.replaceFirst('^final_plots/', '') })
+    // R now writes everything under reports/ (master + per_study/ PDFs + figures/).
+    // Mirror that tree to outdir and to final_outputs/<reports_dir> (prefix stripped).
+    publishDir(path: { "${params.outdir}/reports" }, mode: 'copy', pattern: "reports/**", saveAs: { f -> f.replaceFirst('^reports/', '') })
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_reports_dir}" }, mode: 'copy', pattern: "reports/**", saveAs: { f -> f.replaceFirst('^reports/', '') })
 
     input:
     path aggregated_dir
@@ -15,12 +14,11 @@ process GENERATE_REPORT {
     path consensus_info
 
     output:
-    path "*.pdf",          emit: pdf_reports, optional: true
-    path "final_plots/**", emit: plot_files,  optional: true
+    path "reports/**", emit: report_files, optional: true
 
     script:
     """
-    mkdir -p output/aggregated_data output/final_plots output/reports \
+    mkdir -p output/aggregated_data output/reports \\
              output/real_data_results output/intermediate
 
     cp -r ${aggregated_dir}/* output/aggregated_data/ 2>/dev/null || true
@@ -41,7 +39,7 @@ process GENERATE_REPORT {
     export SECAT_PROJECTDIR="${projectDir}"
     Rscript ${projectDir}/R/08_gen_report.R
 
-    cp output/reports/*.pdf ./ 2>/dev/null || true
-    cp -r output/final_plots ./ 2>/dev/null || true
+    # stage the reports/ tree at the work-dir root so publishDir can pick it up
+    cp -r output/reports ./ 2>/dev/null || true
     """
 }

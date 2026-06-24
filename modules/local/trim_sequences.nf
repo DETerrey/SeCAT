@@ -2,6 +2,8 @@ process TRIM_SEQUENCES {
     tag "trimming sequences"
     label 'mem_16g'
     publishDir(path: { "${params.outdir}/standardized_datasets" }, mode: 'copy', pattern: "*_standardized.fasta")
+    // Preserve the per-study trimmed FASTAs (standardized_datasets is deleted by cleanup)
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_per_study_dir}/standardized_fastas" }, mode: 'copy', pattern: "*_standardized.fasta")
     publishDir(path: { "${params.outdir}/aggregated_data" }, mode: 'copy', pattern: "trim_summary.csv")
     // Duplicate trim summary into final_outputs/verdicts/
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "trim_summary.csv")

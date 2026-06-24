@@ -90,8 +90,11 @@ if (file.exists(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R"))) {
     FINAL_PLOTS_DIR <- file.path(OUTDIR, "final_plots")
 }
 
-output_dir <- if (exists("FINAL_PLOTS_DIR")) FINAL_PLOTS_DIR else file.path(OUTDIR, "final_plots")
-if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+REPORTS_DIR   <- file.path(OUTDIR, "reports")
+PER_STUDY_DIR <- file.path(REPORTS_DIR, "per_study")
+FIGURES_DIR   <- file.path(REPORTS_DIR, "figures")
+output_dir <- REPORTS_DIR
+for (d in c(REPORTS_DIR, PER_STUDY_DIR, FIGURES_DIR)) if (!dir.exists(d)) dir.create(d, recursive = TRUE)
 
 # ==============================================================================
 # SECTION 2: LOAD SHARED DATA
@@ -1985,7 +1988,7 @@ create_method_performance_plot <- function() {
 # Params:   study_name, primer — used to construct expected filename.
 # Returns:  logical.
 check_report_exists <- function(study_name, primer) {
-  file.exists(file.path(output_dir, paste0("Report_Fixed_", study_name, "_", primer, ".pdf")))
+  file.exists(file.path(PER_STUDY_DIR, paste0("Report_Fixed_", study_name, "_", primer, ".pdf")))
 }
 
 message("--- Processing studies with file existence checks ---")
@@ -2130,7 +2133,7 @@ if (!SKIP_INDIVIDUAL) {
             }
 
             # Create Temp Dir for PNGs
-            temp_png_dir <- file.path(output_dir, "temp_pngs", study_name)
+            temp_png_dir <- file.path(FIGURES_DIR, "per_study", study_name)
             dir.create(temp_png_dir, recursive = TRUE, showWarnings = FALSE)
             png_files_for_pdf <- c()
 
@@ -2295,7 +2298,7 @@ if (!SKIP_INDIVIDUAL) {
             if (length(png_files_for_pdf) > 0) {
                 message(paste("  → Creating PDF with", length(png_files_for_pdf), "pages..."))
                 tryCatch({
-                    pdf_filename <- file.path(output_dir, paste0("Report_Fixed_", study_name, "_", primer, ".pdf"))
+                    pdf_filename <- file.path(PER_STUDY_DIR, paste0("Report_Fixed_", study_name, "_", primer, ".pdf"))
                     pdf(pdf_filename, width = PLOT_WIDTH, height = PLOT_HEIGHT, onefile = TRUE)
                     for (png_file in png_files_for_pdf) {
                         img <- png::readPNG(png_file)
@@ -2311,7 +2314,7 @@ if (!SKIP_INDIVIDUAL) {
             }
 
             # Cleanup
-            unlink(temp_png_dir, recursive = TRUE)
+            # keep page PNGs as figures (was: unlink(temp_png_dir, recursive = TRUE))
             rm(current_study_data, verdict_data_for_study, sim_baseline_for_primer, retention_baseline_for_primer)
             gc()
 
@@ -2392,7 +2395,7 @@ tryCatch({
     if (length(master_plots_list) > 0) {
         message(paste("  -> Creating PDF with", length(master_plots_list), "pages..."))
 
-        temp_master_dir <- file.path(output_dir, "temp_master")
+        temp_master_dir <- file.path(FIGURES_DIR, "master")
         dir.create(temp_master_dir, recursive = TRUE, showWarnings = FALSE)
         master_png_files <- c()
 
@@ -2415,7 +2418,7 @@ tryCatch({
         if (length(master_png_files) > 0) {
             message("  -> Combining pages into Master Summary PDF...")
             tryCatch({
-                master_pdf_filename <- file.path(output_dir, "MESAP_Master_Summary_Report.pdf")
+                master_pdf_filename <- file.path(REPORTS_DIR, "MESAP_Master_Summary_Report.pdf")
                 pdf(master_pdf_filename, width = PLOT_WIDTH, height = PLOT_HEIGHT, onefile = TRUE)
                 for (png_file in sort(master_png_files)) {
                     img <- png::readPNG(png_file)
@@ -2431,7 +2434,7 @@ tryCatch({
             message("  [WARN] No master summary pages were successfully created.")
         }
 
-        unlink(temp_master_dir, recursive = TRUE)
+        # keep master page PNGs as figures (was: unlink(temp_master_dir, recursive = TRUE))
 
     } else {
         message("  [WARN] No master summary plots could be created - all plot generation failed.")
