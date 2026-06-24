@@ -52,15 +52,11 @@ fi
 
 # --- Step 2: Intermediate Files ---
 print_header "Step 2: Intermediate Artifacts"
-# Phase 1/2 (Mode Dependent)
 if [ -f "output/intermediate/study_alignment_coords.csv" ]; then
-    print_success "Study Mode coordinates found"
+    print_success "Study alignment coordinates found"
     check_dir_populated "Aligned FASTAs" "output/intermediate/aligned_fastas" "*_aligned.fasta"
-elif [ -f "output/intermediate/primer_coords_phase1_output.csv" ]; then
-    print_success "Primer Mode coordinates found"
-    check_dir_populated "Primer Databases" "output/primer_databases" "*.fasta"
 else
-    print_warning "No coordinate files found (neither Study nor Primer mode artifacts)"
+    print_warning "No study alignment coordinates found"
 fi
 
 check_file_exists "Simulation Task List" "output/intermediate/simulation_tasks.csv"
@@ -78,8 +74,8 @@ check_file_exists "Master Verdict Table" "output/aggregated_data/master_verdict_
 
 # --- Step 5: Final Report ---
 print_header "Step 5: Final Report & Plots"
-check_file_exists "Master Summary PDF" "output/master_summary_report.pdf"
-check_dir_populated "Individual Study Reports" "output/final_plots" "*.pdf"
+check_file_exists "Master Summary PDF" "output/reports/MESAP_Master_Summary_Report.pdf"
+check_dir_populated "Individual Study Reports" "output/reports/per_study" "*.pdf"
 
 # --- Step 6: Log Analysis ---
 print_header "Step 6: Log Analysis"
