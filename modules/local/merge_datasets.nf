@@ -4,16 +4,16 @@ process MERGE_DATASETS {
     // ── Existing publishDir layout (preserved for -resume compatibility) ──
     publishDir(path: { "${params.outdir}/meta_analysis" }, mode: 'copy', pattern: "combined_*")
     publishDir(path: { "${params.outdir}/meta_analysis" }, mode: 'copy', pattern: "asv_mapping_final.tsv")
-    publishDir(path: { "${params.outdir}/comparison/pre_consensus" }, mode: 'copy', pattern: "pre_consensus/*.tsv")
-    publishDir(path: { "${params.outdir}/comparison/post_consensus" }, mode: 'copy', pattern: "post_consensus/*.tsv")
+    publishDir(path: { "${params.outdir}/comparison" }, mode: 'copy', pattern: "pre_consensus/*.tsv")
+    publishDir(path: { "${params.outdir}/comparison" }, mode: 'copy', pattern: "post_consensus/*.tsv")
 
     // ── Consolidated final outputs (user-facing) ────────────────────────────
     // These duplicate the published files into ${params.final_outputs}/ so
     // downstream users only need to look in one place.
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_tables_dir}" }, mode: 'copy', pattern: "combined_*")
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_tables_dir}" }, mode: 'copy', pattern: "asv_mapping_final.tsv")
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_comparison_dir}/pre_consensus" }, mode: 'copy', pattern: "pre_consensus/*.tsv")
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_comparison_dir}/post_consensus" }, mode: 'copy', pattern: "post_consensus/*.tsv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_comparison_dir}" }, mode: 'copy', pattern: "pre_consensus/*.tsv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_comparison_dir}" }, mode: 'copy', pattern: "post_consensus/*.tsv")
 
     input:
     path standardized_fastas
