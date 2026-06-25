@@ -6,6 +6,9 @@ process AGGREGATE {
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "master_verdict_table.csv")
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "simulation_baseline_statistics.csv")
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "simulation_retention_curves.csv")
+    // Per-study + combined taxon-impact tables into final_outputs/supporting/taxon_impact/
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_taxon_impact_dir}" }, mode: 'copy', pattern: "master_taxon_impact_summary.csv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_taxon_impact_dir}" }, mode: 'copy', pattern: "taxon_impact_*.csv")
 
     input:
     path real_results
@@ -17,6 +20,8 @@ process AGGREGATE {
     path "master_verdict_table.csv",           emit: master_verdict_table
     path "simulation_baseline_statistics.csv", emit: baseline_stats,   optional: true
     path "simulation_retention_curves.csv",    emit: retention_curves, optional: true
+    path "master_taxon_impact_summary.csv",    emit: taxon_impact_summary, optional: true
+    path "taxon_impact_*.csv",                 emit: taxon_impact_studies, optional: true
     path "aggregated_data",                                    emit: aggregated_dir
 
     script:
@@ -54,5 +59,7 @@ process AGGREGATE {
     cp aggregated_data/master_verdict_table.csv           ./ 2>/dev/null || true
     cp aggregated_data/simulation_baseline_statistics.csv ./ 2>/dev/null || true
     cp aggregated_data/simulation_retention_curves.csv    ./ 2>/dev/null || true
+    cp aggregated_data/master_taxon_impact_summary.csv    ./ 2>/dev/null || true
+    cp aggregated_data/taxon_impact_*.csv                 ./ 2>/dev/null || true
     """
 }
