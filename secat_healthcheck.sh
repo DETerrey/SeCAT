@@ -68,9 +68,9 @@ check_dir_populated "Real Data Results (RDS)" "output/real_data_results" "*_resu
 
 # --- Step 4: Aggregation ---
 print_header "Step 4: Aggregated Data"
-check_file_exists "Baseline Statistics" "output/aggregated_data/simulation_baseline_statistics.csv"
-check_file_exists "Retention Curves" "output/aggregated_data/simulation_retention_curves.csv"
-check_file_exists "Master Verdict Table" "output/aggregated_data/master_verdict_table.csv"
+check_file_exists "Baseline Statistics" "output/final_outputs/3_verdicts/simulation_baseline_statistics.csv"
+check_file_exists "Retention Curves" "output/final_outputs/3_verdicts/simulation_retention_curves.csv"
+check_file_exists "Master Verdict Table" "output/final_outputs/3_verdicts/master_verdict_table.csv"
 
 # --- Step 5: Final Report ---
 print_header "Step 5: Final Report & Plots"
