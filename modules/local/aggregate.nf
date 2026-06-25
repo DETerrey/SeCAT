@@ -2,11 +2,10 @@ process AGGREGATE {
     tag "aggregating all results"
     label 'mem_64g'
     publishDir(path: { "${params.outdir}/aggregated_data" }, mode: 'copy', pattern: "aggregated_data/*")
-    // Duplicate user-facing verdict + stats tables into final_outputs/verdicts/
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "aggregated_data/master_verdict_table.csv",           saveAs: { f -> file(f).name })
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "aggregated_data/verdict_data_all_levels.csv",        saveAs: { f -> file(f).name })
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "aggregated_data/simulation_baseline_statistics.csv", saveAs: { f -> file(f).name })
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "aggregated_data/simulation_retention_curves.csv",    saveAs: { f -> file(f).name })
+    // Duplicate user-facing verdict + stats tables into final_outputs/3_verdicts/ (flat files at task root)
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "master_verdict_table.csv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "simulation_baseline_statistics.csv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "simulation_retention_curves.csv")
 
     input:
     path real_results
@@ -15,10 +14,9 @@ process AGGREGATE {
     path consensus_info
 
     output:
-    path "aggregated_data/master_verdict_table.csv",           emit: master_verdict_table
-    path "aggregated_data/verdict_data_all_levels.csv",        emit: verdict_data,     optional: true
-    path "aggregated_data/simulation_baseline_statistics.csv", emit: baseline_stats,   optional: true
-    path "aggregated_data/simulation_retention_curves.csv",    emit: retention_curves, optional: true
+    path "master_verdict_table.csv",           emit: master_verdict_table
+    path "simulation_baseline_statistics.csv", emit: baseline_stats,   optional: true
+    path "simulation_retention_curves.csv",    emit: retention_curves, optional: true
     path "aggregated_data",                                    emit: aggregated_dir
 
     script:
@@ -52,5 +50,9 @@ process AGGREGATE {
     export SECAT_PROJECTDIR="${projectDir}"
     Rscript ${projectDir}/R/07_aggregate.R
     cp output/aggregated_data/* aggregated_data/ 2>/dev/null || true
+    # Stage user-facing tables at task root so publishDir can mirror them to 3_verdicts/
+    cp aggregated_data/master_verdict_table.csv           ./ 2>/dev/null || true
+    cp aggregated_data/simulation_baseline_statistics.csv ./ 2>/dev/null || true
+    cp aggregated_data/simulation_retention_curves.csv    ./ 2>/dev/null || true
     """
 }
