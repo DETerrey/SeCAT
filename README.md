@@ -164,13 +164,16 @@ You need:
    reference_db: "/absolute/path/to/SILVA_138.2_SSURef_NR99_tax_silva_full_align_trunc.fasta"
    ```
 
-Before launching anything heavy, validate your inputs with the bundled healthcheck:
+Before launching anything heavy, validate your inputs with the bundled healthcheck. It reads every path from your `params.yaml` (so it is system-agnostic) and runs in stages:
 
 ```bash
-./secat_healthcheck.sh
+./secat_healthcheck.sh pre      # BEFORE launching: manifest, per-study files, and roster present + consistent
+./secat_healthcheck.sh post1    # after phase 1: verdicts + report landed in final_outputs/
+./secat_healthcheck.sh post2    # after --step standardize: merged dataset + verification + comparison
+./secat_healthcheck.sh          # auto: runs 'pre', plus any post-stage whose outputs already exist
 ```
 
-The script verifies that all paths listed in your manifest exist and are readable. It is fast (no compute) and catches the most common configuration mistakes — much cheaper than discovering them after a 24-hour SLURM job has run.
+The `pre` stage verifies that every path in your manifest exists and is readable, that the required columns are present, and — in `roster`/`file` selection mode — that your `selection_file` exists and the studies it lists are actually in the manifest. It is fast (no compute) and catches the most common configuration mistakes, much cheaper than discovering them after a 24-hour SLURM job. The `post` stages confirm the deliverables arrived in `final_outputs/`.
 
 See `examples/README.md` for the format requirements of each input file (feature table, taxonomy, FASTA, metadata).
 
@@ -189,6 +192,11 @@ bind_paths: "/path/to/your/data"     # folder(s) with study files, metadata, ref
 Point it at the folder(s) containing the paths in your manifest plus your
 `reference_db`. One folder for everything? name it. Scattered? comma-separate
 the roots (`"/data/studies,/refs/silva"`).
+
+If your `selection_file` (roster) lives **outside** the SeCAT project folder, add
+its directory here too. The simplest option is to keep the roster **inside** the
+project folder (e.g. `selection_roster.txt` next to `params.yaml`) — the project
+directory is always bound, so no extra `bind_paths` entry is needed.
 
 **Why:** Nextflow 26 enabled the strict config parser by default, which can no
 longer auto-derive these paths from the manifest and does not pass
@@ -451,7 +459,7 @@ process.container = '/absolute/path/to/secat_latest.sif'
 
 **Too few studies flagged EXCLUDE (over-permissive)** — drop `null_model_p_threshold` to 0.01 and increase `null_model_min_consecutive` to 5. Read the calibration section before bigger changes — over-tuning these dismantles the FPR safety net.
 
-**`STANDARDIZE` complains it cannot find `output/intermediate/`** — the cleanup step deleted it. Set `keep_intermediates: true` and re-launch from the beginning, or run STANDARDIZE in the same Nextflow invocation as the verdict step (`auto_trim: true`).
+**`STANDARDIZE` complains it cannot find `output/intermediate/`** — the cleanup step deleted it. Run phase 1 with intermediates retained — either `keep_intermediates: true` in `params.yaml` **or** `--keep_intermediates true` on the command line (both honoured) — and keep the flag on the `--step standardize` run too, so the inputs survive between the two stages. Alternatively run STANDARDIZE in the same Nextflow invocation as the verdict step (`auto_trim: true`).
 
 **Nextflow exits silently after the version banner, or `-resume` fails with a misleading error** (e.g. "--manifest is required" when your `params.yaml` clearly sets it). Symptom: you launch the pipeline, get the `Nextflow ~ version 25.x.x` line, then the shell prompt returns immediately with no SeCAT banner, no errors, no SLURM jobs submitted. Cause: a corrupted Nextflow cache, usually from an earlier `^C`'d or SIGHUP'd run that left the `.nextflow/history` and `.nextflow/cache/` in an inconsistent state. Recovery:
 
