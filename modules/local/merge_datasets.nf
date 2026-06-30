@@ -36,6 +36,7 @@ process MERGE_DATASETS {
     path "post_consensus/sequences.fasta",  emit: post_fasta,           optional: true
 
     script:
+    def absOutdir = params.outdir.startsWith('/') ? params.outdir : "${projectDir}/${params.outdir}"
     """
     mkdir -p standardized_datasets aggregated_data \
              meta_analysis intermediate \
@@ -46,7 +47,7 @@ process MERGE_DATASETS {
     cp ${trim_summary}           standardized_datasets/trim_summary.csv
     cp ${selected_studies_file}  aggregated_data/selected_studies_for_trim.txt
 
-    ln -s ${projectDir}/${params.outdir}/intermediate/aligned_fastas \
+    ln -s ${absOutdir}/intermediate/aligned_fastas \
           intermediate/aligned_fastas 2>/dev/null || true
 
     export SECAT_MANIFEST="${params.manifest}"
