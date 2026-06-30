@@ -116,6 +116,9 @@ if (SELECTION_MODE == "auto") {
   cat(sprintf("Loaded %d selected studies from file\n", length(selected_studies)))
 }
 
+selected_studies <- trimws(selected_studies)
+selected_studies <- selected_studies[nchar(selected_studies) > 0]
+
 cat(sprintf("Targeting %d selected studies...\n", length(selected_studies)))
 
 # --- Load Alignment Coordinates and Consensus Region ---
@@ -161,7 +164,11 @@ for (study in selected_studies) {
   # Look up this study's SILVA alignment coordinate range
   study_coords <- coords %>% filter(study_name == !!study)
   if (nrow(study_coords) == 0) {
-    cat("  [SKIP] No coordinates found.\n\n")
+    cat(sprintf("  [WARN] '%s' not found in analysed studies (check manifest/roster spelling) - SKIPPING.\n\n", study))
+    trim_summary <- bind_rows(trim_summary, tibble(
+      study_name = study, status = "SKIP_NOT_IN_ANALYSIS",
+      original_seqs = NA_integer_, trimmed_seqs = 0L,
+      aligned_length = NA_integer_, degapped_length_min = NA_integer_, degapped_length_max = NA_integer_))
     next
   }
 
