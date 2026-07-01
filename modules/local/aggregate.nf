@@ -51,6 +51,7 @@ process AGGREGATE {
     export SECAT_DISTANCE_CUTOFF="${params.distance_cutoff_threshold}"
     export SECAT_BC_CEILING="${params.bc_ceiling_threshold}"
     export SECAT_RETENTION_FLOOR="${params.retention_floor_threshold}"
+    export SECAT_VERDICT_TOLERANCE_BP="${params.verdict_consensus_tolerance_bp}"
     export SECAT_CONSENSUS_OPT_THRESHOLD="${params.consensus_optimization_threshold}"
     export SECAT_MIN_CONSENSUS_STUDIES="${params.min_consensus_studies}"
     export SECAT_OUTDIR="./output"

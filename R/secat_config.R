@@ -270,6 +270,11 @@ BC_CEILING_THRESHOLD          <- .secat_env("SECAT_BC_CEILING",           0.20, 
 # retention drops below this fraction. Valid values: 0.50-0.95.
 RETENTION_FLOOR_THRESHOLD     <- .secat_env("SECAT_RETENTION_FLOOR",      0.70, "numeric")
 
+# Consensus-vote tolerance window (alignment columns). Degradation is CONFIRMED
+# only when >= 2 detection methods agree within this distance of each other; a
+# lone trigger is WARNING_SINGLE. Valid values: 50-2000.
+VERDICT_CONSENSUS_TOLERANCE_BP <- .secat_env("SECAT_VERDICT_TOLERANCE_BP", 500, "numeric")
+
 # ==============================================================================
 # SECTION 10: OUTPUT AND REGENERATION CONTROL
 # ==============================================================================

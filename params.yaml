@@ -301,6 +301,11 @@ bc_ceiling_threshold:       0.20
 # Taxon retention floor. Valid values: 0.50-0.95 (0.70 default).
 retention_floor_threshold:  0.70
 
+# Consensus-vote tolerance window (alignment columns). A degradation is
+# CONFIRMED only when >= 2 detection methods agree within this distance of each
+# other; a lone trigger is WARNING_SINGLE. Valid values: 50-2000 (500 default).
+verdict_consensus_tolerance_bp: 500
+
 # Absolute Bray-Curtis distance threshold (secondary method, complementing
 # the null model). A study is flagged if median Bray-Curtis exceeds this.
 # Valid values: 0-1 (0.20 = 20% compositional dissimilarity).
