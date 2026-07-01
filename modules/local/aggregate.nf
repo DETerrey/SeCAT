@@ -49,6 +49,8 @@ process AGGREGATE {
     export SECAT_NULL_MODEL_P="${params.null_model_p_threshold}"
     export SECAT_NULL_MODEL_MIN_CONSEC="${params.null_model_min_consecutive}"
     export SECAT_DISTANCE_CUTOFF="${params.distance_cutoff_threshold}"
+    export SECAT_BC_CEILING="${params.bc_ceiling_threshold}"
+    export SECAT_RETENTION_FLOOR="${params.retention_floor_threshold}"
     export SECAT_CONSENSUS_OPT_THRESHOLD="${params.consensus_optimization_threshold}"
     export SECAT_MIN_CONSENSUS_STUDIES="${params.min_consensus_studies}"
     export SECAT_OUTDIR="./output"

@@ -262,6 +262,14 @@ DISTANCE_CUTOFF_THRESHOLD     <- .secat_env("SECAT_DISTANCE_CUTOFF",         0.1
 # Data impact: same dead-zone logic as NULL_MODEL_MIN_TRIM_BP.
 DISTANCE_CUTOFF_MIN_TRIM_BP   <- .secat_env("SECAT_DISTANCE_CUTOFF_MIN_BP",  5,    "numeric")
 
+# Hard-fail Bray-Curtis dissimilarity ceiling. A study hard-fails at the trim
+# where within-region BC dissimilarity exceeds this. Valid values: 0.05-0.50.
+BC_CEILING_THRESHOLD          <- .secat_env("SECAT_BC_CEILING",           0.20, "numeric")
+
+# Hard-fail taxon retention floor. A study hard-fails at the trim where taxon
+# retention drops below this fraction. Valid values: 0.50-0.95.
+RETENTION_FLOOR_THRESHOLD     <- .secat_env("SECAT_RETENTION_FLOOR",      0.70, "numeric")
+
 # ==============================================================================
 # SECTION 10: OUTPUT AND REGENERATION CONTROL
 # ==============================================================================

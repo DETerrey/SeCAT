@@ -291,6 +291,16 @@ null_model_min_consecutive:  2
 #   at very small trims).
 null_model_min_trim_bp:      5
 
+# HARD-FAIL THRESHOLDS
+# A study is HARD-FAILED at the trim step where its within-region community
+# dissimilarity or taxon retention crosses these absolute biological limits,
+# independent of the statistical tests above.
+#
+# Bray-Curtis dissimilarity ceiling. Valid values: 0.05-0.50 (0.20 default).
+bc_ceiling_threshold:       0.20
+# Taxon retention floor. Valid values: 0.50-0.95 (0.70 default).
+retention_floor_threshold:  0.70
+
 # Absolute Bray-Curtis distance threshold (secondary method, complementing
 # the null model). A study is flagged if median Bray-Curtis exceeds this.
 # Valid values: 0-1 (0.20 = 20% compositional dissimilarity).
@@ -382,7 +392,7 @@ selection_mode: "roster"
 
 # Path to the roster/selection file (only used when selection_mode = "roster"
 # ). One study ID per line.
-selection_file: "/home/users/dterrey/SeCAT/selection_roster.txt"       
+selection_file: "/home/users/dterrey/SeCAT_AlessiaTest/SeCAT/selection_roster.txt"
 
 # ==============================================================================
 # REPORTS AND OUTPUT CONTROL
@@ -390,7 +400,7 @@ selection_file: "/home/users/dterrey/SeCAT/selection_roster.txt"
 
 # Plot resolution in dots per inch. Affects file size and print quality.
 # Valid values: positive integer (150-600; 300 = publication standard).
-plot_dpi:         300
+plot_dpi:         600
 
 # Force regeneration of all outputs, ignoring cached intermediate results.
 # Valid values: true / false.
