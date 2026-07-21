@@ -944,8 +944,9 @@ main <- function() {
   # ===== STEP 2: PROCESS REAL DATA RESULTS =====
   log_and_flush("--- STEP 2: Processing Real Data Results ---")
 
-  distance_cutoff       <- if (exists("DISTANCE_FROM_BASELINE_CUTOFF"))  DISTANCE_FROM_BASELINE_CUTOFF  else 0.15
-  empirical_p_threshold <- if (exists("EMPIRICAL_NULL_P_THRESHOLD"))     EMPIRICAL_NULL_P_THRESHOLD     else 0.05
+  distance_cutoff       <- if (exists("DISTANCE_CUTOFF_THRESHOLD"))      DISTANCE_CUTOFF_THRESHOLD      else 0.15
+  empirical_p_threshold <- if (exists("NULL_MODEL_P_THRESHOLD"))         NULL_MODEL_P_THRESHOLD         else 0.05
+  null_min_consecutive  <- if (exists("NULL_MODEL_MIN_CONSECUTIVE"))     NULL_MODEL_MIN_CONSECUTIVE     else 3L
   penalty_method        <- if (exists("CHANGEPOINT_PENALTY_METHOD"))     toupper(CHANGEPOINT_PENALTY_METHOD) else "SIC"
   penalty_scan          <- if (exists("CHANGEPOINT_BOOTSTRAP_SCAN"))     CHANGEPOINT_BOOTSTRAP_SCAN     else seq(0.4, 2.4, by = 0.1)
   bootstrap_n           <- if (exists("CHANGEPOINT_BOOTSTRAP_N"))        CHANGEPOINT_BOOTSTRAP_N        else 50
@@ -1020,7 +1021,8 @@ main <- function() {
       res_cutoff <- find_degradation_point(real_curve, sim_data_for_task, sim_baseline_for_task,
                                            level, task_id_for_sims, distance_cutoff, min_trim_bp = 10)
       res_null   <- find_null_model_point(real_curve, sim_data_for_task,
-                                          level, task_id_for_sims, empirical_p_threshold, min_trim_bp = 10)
+                                          level, task_id_for_sims, empirical_p_threshold,
+                                          min_consecutive_steps = null_min_consecutive, min_trim_bp = 10)
       res_bc     <- find_bc_ceiling_point(real_curve, level, target_trim,
                                           bc_ceiling = bc_ceiling, min_trim_bp = 10)
       res_ret    <- find_retention_floor_point(current_study_data$retention_data, level, target_trim,

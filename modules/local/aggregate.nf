@@ -26,6 +26,9 @@ process AGGREGATE {
 
     script:
     """
+    # v5.0.0 detection-threshold wiring fix: AGGREGATE now honours params.yaml
+    # (distance_cutoff_threshold, null_model_p_threshold, null_model_min_consecutive).
+    # This comment changes the task hash so -resume re-runs AGGREGATE after the R fix.
     mkdir -p output/intermediate output/real_data_results output/simulation_results aggregated_data
     cp ${study_coords}   output/intermediate/study_alignment_coords.csv 2>/dev/null || true
     cp ${consensus_info} output/intermediate/consensusregioninfo.csv    2>/dev/null || true
