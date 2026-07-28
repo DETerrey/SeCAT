@@ -1,32 +1,28 @@
-name: Build and Push Container
-
+name: build-container
 on:
   push:
-    paths:
-      - 'containers/Dockerfile'
-  workflow_dispatch:   # allows manual trigger from GitHub UI
-
+    branches: [main]
+  workflow_dispatch: {}
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and Push
-        uses: docker/build-push-action@v5
+      - id: push
+        uses: docker/build-push-action@v6
         with:
-          context: ./containers
+          context: .
+          file: containers/Dockerfile
           push: true
-          tags: ghcr.io/deterrey/secat:latest
+          tags: |
+            ghcr.io/deterrey/secat:5.0.0
+            ghcr.io/deterrey/secat:latest
+      - run: echo "digest = ${{ steps.push.outputs.digest }}"

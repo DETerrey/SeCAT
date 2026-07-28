@@ -1,4 +1,4 @@
-# SeCAT v4.1
+# SeCAT v5.0.0
 FROM rocker/r-ver:4.3.2
 ENV LC_ALL=C
 ENV PATH=/usr/local/bin:/usr/bin:/bin
@@ -16,33 +16,14 @@ RUN VSEARCH_VERSION=2.23.0 && \
     cp vsearch-${VSEARCH_VERSION}-linux-x86_64/bin/vsearch /usr/local/bin/vsearch && \
     chmod +x /usr/local/bin/vsearch && \
     rm -rf vsearch-${VSEARCH_VERSION}-linux-x86_64*
-RUN R --no-save --no-restore -e "\
-    options(repos = c(CRAN = 'https://cloud.r-project.org')); \
-    install.packages(c('ggplot2','dplyr','tidyr','readr','purrr','tibble', \
-                       'stringr','forcats','lubridate','tidyverse'), \
-                     dependencies = TRUE)"
-RUN R --no-save --no-restore -e "\
-    options(repos = c(CRAN = 'https://cloud.r-project.org')); \
-    install.packages(c('data.table','here','vegan','changepoint', \
-                       'magick','patchwork','gridExtra','ggrepel', \
-                       'fs','scales','digest'), dependencies = TRUE)"
-RUN R --no-save --no-restore -e "\
-    options(repos = c(CRAN = 'https://cloud.r-project.org')); \
-    install.packages(c('irr','ape','igraph','RColorBrewer','microeco'), \
-                     dependencies = TRUE)"
-RUN R --no-save --no-restore -e "\
-    if (!requireNamespace('BiocManager', quietly = TRUE)) \
-        install.packages('BiocManager', repos = 'https://cloud.r-project.org'); \
-    BiocManager::install(c('Biostrings','DECIPHER'), ask = FALSE, update = FALSE)"
-RUN R --no-save --no-restore -e "\
-    pkgs <- c('ggplot2','dplyr','tidyr','readr','Biostrings','DECIPHER', \
-              'vegan','changepoint','magick','here','data.table', \
-              'irr','ape','igraph','RColorBrewer','microeco'); \
-    missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]; \
-    if (length(missing) > 0) stop(paste('Missing:', paste(missing, collapse=', '))); \
-    message('All packages verified OK')"
+RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('ggplot2','dplyr','tidyr','readr','purrr','tibble','stringr','forcats','lubridate','tidyverse'), dependencies=TRUE)"
+RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('data.table','here','vegan','changepoint','magick','patchwork','gridExtra','ggrepel','fs','scales','digest'), dependencies=TRUE)"
+RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('irr','ape','igraph','RColorBrewer','microeco'), dependencies=TRUE)"
+RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('remotes','pulsar','huge','VGAM'), dependencies=TRUE); remotes::install_github('zdk123/SpiecEasi', upgrade='never'); if(!requireNamespace('SpiecEasi',quietly=TRUE)) stop('SpiecEasi install failed')"
+RUN R --no-save --no-restore -e "if(!requireNamespace('BiocManager',quietly=TRUE)) install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install(c('Biostrings','DECIPHER'), ask=FALSE, update=FALSE)"
+RUN R --no-save --no-restore -e "pkgs<-c('ggplot2','Biostrings','DECIPHER','vegan','changepoint','magick','here','data.table','irr','ape','igraph','microeco','SpiecEasi'); m<-pkgs[!sapply(pkgs,requireNamespace,quietly=TRUE)]; if(length(m)>0) stop(paste('Missing:',paste(m,collapse=', '))); message('All packages verified OK')"
 RUN vsearch --version
 LABEL org.opencontainers.image.title="SeCAT"
-LABEL org.opencontainers.image.description="Sequence Consensus Amplicon Trimming v4.1"
-LABEL org.opencontainers.image.version="4.1"
-LABEL org.opencontainers.image.source="https://github.com/DerbyDT/SeCAT"
+LABEL org.opencontainers.image.description="Sequence Consensus Amplicon Trimming v5.0.0"
+LABEL org.opencontainers.image.version="5.0.0"
+LABEL org.opencontainers.image.source="https://github.com/DETerrey/SeCAT"
