@@ -21,7 +21,11 @@ RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.o
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('data.table','here','vegan','changepoint','magick','patchwork','gridExtra','ggrepel','fs','scales','digest'), dependencies=TRUE)"
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('irr','ape','igraph','RColorBrewer','microeco'), dependencies=TRUE)"
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('remotes','Rcpp','RcppArmadillo','Matrix','MASS','glmnet','pulsar','huge','VGAM')); for (p in c('Rcpp','RcppArmadillo','Matrix','glmnet','pulsar','huge','VGAM')) if(!requireNamespace(p, quietly=TRUE)) stop(paste('dependency failed to install:', p))"
-RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); remotes::install_github('zdk123/SpiecEasi', upgrade='never'); if(!requireNamespace('SpiecEasi', quietly=TRUE)) stop('SpiecEasi install failed')"
+RUN set -e; \
+    curl -fsSL https://github.com/zdk123/SpiecEasi/archive/refs/heads/master.tar.gz -o /tmp/spieceasi.tar.gz \
+      || curl -fsSL https://github.com/zdk123/SpiecEasi/archive/refs/heads/main.tar.gz -o /tmp/spieceasi.tar.gz; \
+    R --no-save --no-restore -e "install.packages('/tmp/spieceasi.tar.gz', repos=NULL, type='source'); if(!requireNamespace('SpiecEasi', quietly=TRUE)) stop('SpiecEasi install failed')"; \
+    rm -f /tmp/spieceasi.tar.gz
 RUN R --no-save --no-restore -e "if(!requireNamespace('BiocManager',quietly=TRUE)) install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install(c('Biostrings','DECIPHER'), ask=FALSE, update=FALSE)"
 RUN R --no-save --no-restore -e "pkgs<-c('ggplot2','Biostrings','DECIPHER','vegan','changepoint','magick','here','data.table','irr','ape','igraph','microeco','SpiecEasi'); m<-pkgs[!sapply(pkgs,requireNamespace,quietly=TRUE)]; if(length(m)>0) stop(paste('Missing:',paste(m,collapse=', '))); message('All packages verified OK')"
 RUN vsearch --version
