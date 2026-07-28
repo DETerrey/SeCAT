@@ -1507,25 +1507,35 @@ tryCatch({
   cat(sprintf("\n--- TIER 3B: Network Stability (%s) ---\n\n", taxa_level))
 
   tryCatch({
-    cat("  Building co-occurrence networks (this may take several minutes)...\n")
+    cat("  Building SPIEC-EASI co-occurrence networks (slow, especially at ASV level)...\n")
 
+    # SPIEC-EASI (neighbourhood selection, 'mb') — compositionally robust network
+    # inference via microeco::trans_network. cor_method=NULL selects a
+    # non-correlation method; COR_p_thres/COR_cut do not apply. StARS resampling
+    # is seeded for reproducibility. Extra spiec.easi/pulsar args pass through '...'.
     net_b <- trans_network$new(
-      dataset     = dataset_before,
-      cor_method  = "spearman",
-      filter_thres = 0.0005,
-      nThreads    = min(4, ncores)
+      dataset      = dataset_before,
+      cor_method   = NULL,
+      filter_thres = 0.0005
     )
-    net_b$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
-    cat("  ✓ BEFORE network built\n")
+    net_b$cal_network(
+      network_method   = "SpiecEasi",
+      SpiecEasi_method = "mb",
+      pulsar.params    = list(rep.num = 50, ncores = min(4, ncores), seed = 10010)
+    )
+    cat("  ✓ BEFORE network built (SPIEC-EASI)\n")
 
     net_a <- trans_network$new(
-      dataset     = dataset_after,
-      cor_method  = "spearman",
-      filter_thres = 0.0005,
-      nThreads    = min(4, ncores)
+      dataset      = dataset_after,
+      cor_method   = NULL,
+      filter_thres = 0.0005
     )
-    net_a$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
-    cat("  ✓ AFTER network built\n\n")
+    net_a$cal_network(
+      network_method   = "SpiecEasi",
+      SpiecEasi_method = "mb",
+      pulsar.params    = list(rep.num = 50, ncores = min(4, ncores), seed = 10010)
+    )
+    cat("  ✓ AFTER network built (SPIEC-EASI)\n\n")
 
     g_b <- net_b$res_network
     g_a <- net_a$res_network

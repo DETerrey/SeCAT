@@ -30,6 +30,14 @@ RUN R --no-save --no-restore -e "\
     options(repos = c(CRAN = 'https://cloud.r-project.org')); \
     install.packages(c('irr','ape','igraph','RColorBrewer','microeco'), \
                      dependencies = TRUE)"
+# SPIEC-EASI (compositionally robust network inference used by VALIDATE Tier 3B).
+# GitHub-only; CRAN deps pulsar/huge/VGAM installed first. Consider pinning a
+# SpiecEasi release tag (ref=) for exact reproducibility and record via sessionInfo().
+RUN R --no-save --no-restore -e "\
+    options(repos = c(CRAN = 'https://cloud.r-project.org')); \
+    install.packages(c('remotes','pulsar','huge','VGAM'), dependencies = TRUE); \
+    remotes::install_github('zdk123/SpiecEasi', upgrade = 'never'); \
+    if (!requireNamespace('SpiecEasi', quietly = TRUE)) stop('SpiecEasi install failed')"
 RUN R --no-save --no-restore -e "\
     if (!requireNamespace('BiocManager', quietly = TRUE)) \
         install.packages('BiocManager', repos = 'https://cloud.r-project.org'); \
@@ -37,7 +45,7 @@ RUN R --no-save --no-restore -e "\
 RUN R --no-save --no-restore -e "\
     pkgs <- c('ggplot2','dplyr','tidyr','readr','Biostrings','DECIPHER', \
               'vegan','changepoint','magick','here','data.table', \
-              'irr','ape','igraph','RColorBrewer','microeco'); \
+              'irr','ape','igraph','RColorBrewer','microeco','SpiecEasi'); \
     missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]; \
     if (length(missing) > 0) stop(paste('Missing:', paste(missing, collapse=', '))); \
     message('All packages verified OK')"

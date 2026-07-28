@@ -23,6 +23,8 @@ input:
 
     script:
     """
+    # v5.0.0 network change: VALIDATE Tier 3B now uses SPIEC-EASI (was Spearman).
+    # This comment changes the task hash so -resume re-runs VALIDATE after the R change.
     mkdir -p logs outputs pre_consensus post_consensus \
              output/intermediate output/standardized_datasets
 
