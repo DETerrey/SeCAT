@@ -8,6 +8,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
         libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
         libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
         libgit2-dev libmagick++-dev imagemagick build-essential \
+        gfortran libblas-dev liblapack-dev \
         zlib1g-dev libbz2-dev liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN VSEARCH_VERSION=2.23.0 && \
@@ -19,7 +20,8 @@ RUN VSEARCH_VERSION=2.23.0 && \
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('ggplot2','dplyr','tidyr','readr','purrr','tibble','stringr','forcats','lubridate','tidyverse'), dependencies=TRUE)"
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('data.table','here','vegan','changepoint','magick','patchwork','gridExtra','ggrepel','fs','scales','digest'), dependencies=TRUE)"
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('irr','ape','igraph','RColorBrewer','microeco'), dependencies=TRUE)"
-RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('remotes','pulsar','huge','VGAM'), dependencies=TRUE); remotes::install_github('zdk123/SpiecEasi', upgrade='never'); if(!requireNamespace('SpiecEasi',quietly=TRUE)) stop('SpiecEasi install failed')"
+RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('remotes','Rcpp','RcppArmadillo','Matrix','MASS','glmnet','pulsar','huge','VGAM')); for (p in c('Rcpp','RcppArmadillo','Matrix','glmnet','pulsar','huge','VGAM')) if(!requireNamespace(p, quietly=TRUE)) stop(paste('dependency failed to install:', p))"
+RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); remotes::install_github('zdk123/SpiecEasi', upgrade='never'); if(!requireNamespace('SpiecEasi', quietly=TRUE)) stop('SpiecEasi install failed')"
 RUN R --no-save --no-restore -e "if(!requireNamespace('BiocManager',quietly=TRUE)) install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install(c('Biostrings','DECIPHER'), ask=FALSE, update=FALSE)"
 RUN R --no-save --no-restore -e "pkgs<-c('ggplot2','Biostrings','DECIPHER','vegan','changepoint','magick','here','data.table','irr','ape','igraph','microeco','SpiecEasi'); m<-pkgs[!sapply(pkgs,requireNamespace,quietly=TRUE)]; if(length(m)>0) stop(paste('Missing:',paste(m,collapse=', '))); message('All packages verified OK')"
 RUN vsearch --version
