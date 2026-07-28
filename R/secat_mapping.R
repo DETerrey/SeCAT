@@ -190,6 +190,50 @@ calculate_consensus_coordinates <- function(all_ref_starts, all_ref_ends, method
 #                  in alignment space.
 #   Returns NULL if the FASTA is missing/empty or alignment fails.
 # ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Function: align_asvs_to_reference  (scalable, chunked, fixed reference frame)
+# ------------------------------------------------------------------------------
+align_asvs_to_reference <- function(asv_clean, ref_profile, chunk_size = 40000L) {
+  ref_names <- names(ref_profile)
+  W_ref     <- unique(Biostrings::width(ref_profile))
+  if (length(W_ref) != 1L) stop("Reference profile is not a fixed-width alignment.")
+  n_ref <- length(ref_profile)
+  cm0     <- Biostrings::consensusMatrix(ref_profile)
+  gap0    <- if ("-" %in% rownames(cm0)) cm0["-", ] else rep(0L, W_ref)
+  origGap <- (n_ref - gap0) == 0L
+  n   <- length(asv_clean)
+  idx <- split(seq_len(n), ceiling(seq_len(n) / chunk_size))
+  message(sprintf("  - Chunked alignment: %d ASVs in %d chunk(s) of up to %d; rendering to the fixed %d-column reference frame.",
+                  n, length(idx), chunk_size, W_ref))
+  parts <- vector("list", length(idx))
+  for (k in seq_along(idx)) {
+    chunk  <- asv_clean[idx[[k]]]
+    prof   <- if (length(chunk) > 1L) DECIPHER::AlignSeqs(chunk, verbose = FALSE) else chunk
+    merged <- DECIPHER::AlignProfiles(pattern = prof, subject = ref_profile)
+    rcm  <- Biostrings::consensusMatrix(merged[ref_names])
+    rgap <- if ("-" %in% rownames(rcm)) rcm["-", ] else rep(0L, ncol(rcm))
+    occ  <- (n_ref - rgap) > 0L
+    Wm   <- length(occ)
+    keepCols <- integer(W_ref); sidx <- 1L
+    for (mc in seq_len(Wm)) {
+      if (sidx > W_ref) break
+      if (occ[mc])            { keepCols[sidx] <- mc; sidx <- sidx + 1L }
+      else if (origGap[sidx]) { keepCols[sidx] <- mc; sidx <- sidx + 1L }
+    }
+    if (sidx <= W_ref) stop(sprintf("chunk %d: mapped only %d of %d reference columns.", k, sidx - 1L, W_ref))
+    keep_ir <- IRanges::reduce(IRanges::IRanges(start = keepCols, width = 1L))
+    pieces  <- Biostrings::extractAt(merged[names(chunk)], keep_ir)
+    seqs    <- Biostrings::DNAStringSet(vapply(pieces, function(p) paste(as.character(p), collapse = ""), character(1)))
+    names(seqs) <- names(chunk)
+    parts[[k]]  <- seqs
+    rm(merged, rcm, pieces, seqs); gc(FALSE)
+  }
+  out <- do.call(base::c, parts)
+  if (length(unique(Biostrings::width(out))) != 1L)
+    stop("Chunked alignment produced inconsistent widths -- frame reconstruction failed.")
+  out
+}
+
 map_study_to_reference <- function(study_info, reference_db_path, config) {
 
   message(paste("Processing study:", study_info$study_name))
@@ -302,13 +346,15 @@ map_study_to_reference <- function(study_info, reference_db_path, config) {
   asv_clean <- Biostrings::DNAStringSet(gsub("[-.]", "", as.character(asv_sequences)))
   names(asv_clean) <- names(asv_sequences)
 
-  # Step 1: Align ASVs to each other (temporarily)
-  asv_profile <- DECIPHER::AlignSeqs(asv_clean, verbose = FALSE)
-  # Step 2: Align the ASV profile to the Reference profile
-  merged_alignment <- DECIPHER::AlignProfiles(pattern = asv_profile, subject = ref_profile)
-
-  # Filter to keep only the study sequences (exclude reference profile sequences)
-  aligned_asvs <- merged_alignment[names(asv_clean)]
+  SAFE_ALIGN_N <- 65000L
+  if (length(asv_clean) > SAFE_ALIGN_N) {
+    message(sprintf("  - Large study (%d ASVs > %d): chunked fixed-frame alignment.", length(asv_clean), SAFE_ALIGN_N))
+    aligned_asvs <- align_asvs_to_reference(asv_clean, ref_profile, chunk_size = 40000L)
+  } else {
+    asv_profile <- DECIPHER::AlignSeqs(asv_clean, verbose = FALSE)
+    merged_alignment <- DECIPHER::AlignProfiles(pattern = asv_profile, subject = ref_profile)
+    aligned_asvs <- merged_alignment[names(asv_clean)]
+  }
 
   # 6. Extract Coordinates from Alignment
   message("  - Extracting coordinates...")
@@ -341,6 +387,21 @@ map_study_to_reference <- function(study_info, reference_db_path, config) {
   modal_end <- consensus$end
   analysis_length <- modal_end - modal_start + 1
 
+  # --- Mapping QC: how tightly the ASVs converge on the declared window ---
+  .band <- if (exists("MAPPING_SUPPORT_BAND")) MAPPING_SUPPORT_BAND else 250
+  .warn <- if (exists("MAPPING_SUPPORT_WARN")) MAPPING_SUPPORT_WARN else 0.70
+  .fail <- if (exists("MAPPING_SUPPORT_FAIL")) MAPPING_SUPPORT_FAIL else 0.40
+  .conc <- abs(all_ref_starts - modal_start) <= .band & abs(all_ref_ends - modal_end) <= .band
+  window_support <- if (length(.conc)) mean(.conc) else NA_real_
+  start_mad <- stats::median(abs(all_ref_starts - modal_start))
+  end_mad   <- stats::median(abs(all_ref_ends   - modal_end))
+  mapping_quality <- if (is.na(window_support)) "NONE" else
+                     if (window_support >= .warn) "CONVERGED" else
+                     if (window_support >= .fail) "MARGINAL" else "UNSTABLE"
+  if (!identical(mapping_quality, "CONVERGED"))
+    message(sprintf("  [MAP-QC] %s: %s (support=%.2f, start_mad=%.0f, end_mad=%.0f) -- ASVs do not converge on one window; check upstream QC.",
+                    study_info$study_name, mapping_quality, window_support, start_mad, end_mad))
+
   # 8. Build Output Summary
   output_summary <- tibble::tibble(
     study_name = study_info$study_name,
@@ -352,7 +413,11 @@ map_study_to_reference <- function(study_info, reference_db_path, config) {
     original_start_theoretical = NA,
     initial_fwd_trim = study_info$initial_fwd_trim,
     initial_rev_trim = study_info$initial_rev_trim,
-    num_asvs_mapped = length(all_ref_starts)
+    num_asvs_mapped = length(all_ref_starts),
+    window_support = window_support,
+    mapping_quality = mapping_quality,
+    start_mad = start_mad,
+    end_mad = end_mad
   )
 
   # 9. Build Detailed Coordinate Table (NEW)

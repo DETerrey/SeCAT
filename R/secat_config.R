@@ -275,6 +275,12 @@ RETENTION_FLOOR_THRESHOLD     <- .secat_env("SECAT_RETENTION_FLOOR",      0.70, 
 # lone trigger is WARNING_SINGLE. Valid values: 50-2000.
 VERDICT_CONSENSUS_TOLERANCE_BP <- .secat_env("SECAT_VERDICT_TOLERANCE_BP", 500, "numeric")
 
+# --- Mapping quality-control (convergence check) ---
+MAPPING_SUPPORT_BAND            <- .secat_env("SECAT_MAPPING_SUPPORT_BAND", 250,  "numeric")
+MAPPING_SUPPORT_WARN            <- .secat_env("SECAT_MAPPING_SUPPORT_WARN", 0.70, "numeric")
+MAPPING_SUPPORT_FAIL            <- .secat_env("SECAT_MAPPING_SUPPORT_FAIL", 0.40, "numeric")
+EXCLUDE_UNSTABLE_FROM_CONSENSUS <- .secat_env("SECAT_EXCLUDE_UNSTABLE",     TRUE, "logical")
+
 # ==============================================================================
 # SECTION 10: OUTPUT AND REGENERATION CONTROL
 # ==============================================================================

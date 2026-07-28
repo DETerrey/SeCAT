@@ -28,7 +28,7 @@
 # taxonomy path, and metadata path.
 # Valid values: absolute path to a correctly formatted SeCAT manifest.
 # Data impact: defines the entire study set entering the pipeline.
-manifest:     "/home/users/dterrey/SeCAT_AlessiaTest/SeCAT/secat_manifest.tsv"
+manifest:     "/home/users/dterrey/SeCAT_AlessiaTest/Data_David/secat_manifest.tsv"
 
 # Path to the SILVA reference alignment (full-length, aligned, truncated FASTA).
 # Must be the NR99 (non-redundant 99%) version for consistent coordinate mapping.
@@ -43,7 +43,7 @@ reference_db: "/home/users/dterrey/secat_data/references/SILVA_138.2_SSURef_NR99
 # Mounted into the Singularity/Docker container so it can read them.
 #   bind_paths: "/data/my_project"              # one folder holds everything
 #   bind_paths: "/data/studies,/refs/silva"     # data in several places
-bind_paths: "/home/users/dterrey/secat_data"
+bind_paths: "/home/users/dterrey/SeCAT_AlessiaTest/Data_David,/home/users/dterrey/secat_data"
 
 # ==============================================================================
 # OUTPUT DIRECTORY
@@ -306,6 +306,14 @@ retention_floor_threshold:  0.70
 # other; a lone trigger is WARNING_SINGLE. Valid values: 50-2000 (500 default).
 verdict_consensus_tolerance_bp: 500
 
+# --- Mapping quality-control (convergence check) ---
+# window_support = fraction of a study's ASVs within mapping_support_band columns of the
+# modal start AND end. Below _fail = UNSTABLE (unreliable); below _warn = MARGINAL.
+mapping_support_band:            250
+mapping_support_warn:            0.70
+mapping_support_fail:            0.40
+exclude_unstable_from_consensus: true
+
 # Absolute Bray-Curtis distance threshold (secondary method, complementing
 # the null model). A study is flagged if median Bray-Curtis exceeds this.
 # Valid values: 0-1 (0.20 = 20% compositional dissimilarity).
@@ -393,7 +401,7 @@ harmonize_metadata: true
 # recommended on new datasets not already vetted via a previous run. 
 # Manual review of the datasets and trim results is preferable to allow
 # for appropriate verdict selection. 
-selection_mode: "roster"  
+selection_mode: "roster"
 
 # Path to the roster/selection file (only used when selection_mode = "roster"
 # ). One study ID per line.

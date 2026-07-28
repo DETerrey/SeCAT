@@ -370,12 +370,28 @@ main <- function() {
         # Load the clique-based consensus finder
         source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_consensus.R"))
 
+        # Exclude UNSTABLE-mapping studies from the consensus (they cannot define a
+        # reliable shared region). Gated by EXCLUDE_UNSTABLE_FROM_CONSENSUS; excluded
+        # studies remain in simulations, trimming and all outputs.
+        consensus_coords <- study_coords
+        if (exists("EXCLUDE_UNSTABLE_FROM_CONSENSUS") && isTRUE(EXCLUDE_UNSTABLE_FROM_CONSENSUS) &&
+            "mapping_quality" %in% names(study_coords)) {
+          .drop <- which(study_coords$mapping_quality == "UNSTABLE")
+          if (length(.drop) > 0 && length(.drop) < nrow(study_coords)) {
+            log_and_flush(sprintf("--- [MAP-QC] Excluding %d UNSTABLE study(ies) from consensus: %s",
+                                  length(.drop), paste(study_coords$study_name[.drop], collapse = ", ")))
+            consensus_coords <- study_coords[-.drop, , drop = FALSE]
+          } else if (length(.drop) == nrow(study_coords)) {
+            log_and_flush("--- [MAP-QC] WARNING: all studies UNSTABLE; using all for consensus.")
+          }
+        }
+
         # Find the largest set of mutually overlapping studies (clique algorithm)
         # and define the consensus as the intersection of their aligned coordinates
         consres <- find_largest_overlapping_clique(
-          starts = study_coords$ref_start,
-          ends = study_coords$ref_end,
-          study_names = study_coords$study_name,
+          starts = consensus_coords$ref_start,
+          ends = consensus_coords$ref_end,
+          study_names = consensus_coords$study_name,
           min_overlap = 50
         )
 

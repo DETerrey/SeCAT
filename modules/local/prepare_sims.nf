@@ -35,6 +35,7 @@ process PREPARE_SIMS {
     mkdir -p intermediate
     cp ${study_coords} ./intermediate/study_alignment_coords.csv
     export SECAT_PROJECTDIR="${projectDir}"
+    export SECAT_EXCLUDE_UNSTABLE="${params.exclude_unstable_from_consensus}"
     Rscript ${projectDir}/R/04_prepare_sims.R
     cp ./intermediate/simulation_tasks.csv              ./simulation_tasks.csv
     cp ./intermediate/simulation_reference_subset.fasta ./simulation_reference_subset.fasta

@@ -32,6 +32,9 @@ process STUDY_MAPPING {
     export SECAT_ALIGNMENT_METHOD="${params.study_alignment_method}"
     export SECAT_OUTDIR="${absOutdir}"
     export SECAT_PROJECTDIR="${projectDir}"
+    export SECAT_MAPPING_SUPPORT_BAND="${params.mapping_support_band}"
+    export SECAT_MAPPING_SUPPORT_WARN="${params.mapping_support_warn}"
+    export SECAT_MAPPING_SUPPORT_FAIL="${params.mapping_support_fail}"
     Rscript ${projectDir}/R/02_study_mapping.R
 
     # Symlink outputs into work directory for Nextflow to stage

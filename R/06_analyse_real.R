@@ -196,11 +196,23 @@ if (ANALYSIS_MODE == "primer") {
 
     all_coords_data <- readr::read_csv(coords_path, show_col_types = FALSE)
 
+    # Exclude UNSTABLE-mapping studies from the consensus (mirrors 04_prepare_sims).
+    consensus_coords <- all_coords_data
+    if (exists("EXCLUDE_UNSTABLE_FROM_CONSENSUS") && isTRUE(EXCLUDE_UNSTABLE_FROM_CONSENSUS) &&
+        "mapping_quality" %in% names(all_coords_data)) {
+      .drop <- which(all_coords_data$mapping_quality == "UNSTABLE")
+      if (length(.drop) > 0 && length(.drop) < nrow(all_coords_data)) {
+        cat(sprintf("   -> [MAP-QC] Excluding %d UNSTABLE study(ies) from consensus: %s\n",
+                    length(.drop), paste(all_coords_data$study_name[.drop], collapse = ", ")))
+        consensus_coords <- all_coords_data[-.drop, , drop = FALSE]
+      }
+    }
+
     # Run clique algorithm on empirical coordinates
     consensus_result <- find_largest_overlapping_clique(
-        starts = all_coords_data$ref_start,
-        ends = all_coords_data$ref_end,
-        study_names = all_coords_data$study_name,
+        starts = consensus_coords$ref_start,
+        ends = consensus_coords$ref_end,
+        study_names = consensus_coords$study_name,
         min_overlap = 50
     )
 

@@ -41,6 +41,7 @@ process ANALYSE_REAL {
     cp ${consensus_info} output/intermediate/consensusregioninfo.csv    2>/dev/null || true
     cp ${aligned_fasta}  output/intermediate/aligned_fastas/${study_name}_aligned.fasta
     export SECAT_PROJECTDIR="${projectDir}"
+    export SECAT_EXCLUDE_UNSTABLE="${params.exclude_unstable_from_consensus}"
     Rscript ${projectDir}/R/06_analyse_real.R "${study_name}"
     mv output/real_data_results/${study_name}/${study_name}_results.rds ./${study_name}_results.rds
     """
