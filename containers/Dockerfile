@@ -22,8 +22,7 @@ RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.o
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('irr','ape','igraph','RColorBrewer','microeco'), dependencies=TRUE)"
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); install.packages(c('remotes','Rcpp','RcppArmadillo','Matrix','MASS','glmnet','pulsar','huge','VGAM')); for (p in c('Rcpp','RcppArmadillo','Matrix','glmnet','pulsar','huge','VGAM')) if(!requireNamespace(p, quietly=TRUE)) stop(paste('dependency failed to install:', p))"
 RUN set -e; \
-    curl -fsSL https://github.com/zdk123/SpiecEasi/archive/refs/heads/master.tar.gz -o /tmp/spieceasi.tar.gz \
-      || curl -fsSL https://github.com/zdk123/SpiecEasi/archive/refs/heads/main.tar.gz -o /tmp/spieceasi.tar.gz; \
+    curl -fsSL https://github.com/zdk123/SpiecEasi/archive/refs/tags/v1.1.3.tar.gz -o /tmp/spieceasi.tar.gz; \
     R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); remotes::install_local('/tmp/spieceasi.tar.gz', dependencies=TRUE, upgrade='never'); if(!requireNamespace('SpiecEasi', quietly=TRUE)) stop('SpiecEasi install failed')"; \
     rm -f /tmp/spieceasi.tar.gz
 RUN R --no-save --no-restore -e "if(!requireNamespace('BiocManager',quietly=TRUE)) install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install(c('Biostrings','DECIPHER'), ask=FALSE, update=FALSE)"
