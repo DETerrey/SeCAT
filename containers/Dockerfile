@@ -24,7 +24,7 @@ RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.o
 RUN set -e; \
     curl -fsSL https://github.com/zdk123/SpiecEasi/archive/refs/heads/master.tar.gz -o /tmp/spieceasi.tar.gz \
       || curl -fsSL https://github.com/zdk123/SpiecEasi/archive/refs/heads/main.tar.gz -o /tmp/spieceasi.tar.gz; \
-    R --no-save --no-restore -e "install.packages('/tmp/spieceasi.tar.gz', repos=NULL, type='source'); if(!requireNamespace('SpiecEasi', quietly=TRUE)) stop('SpiecEasi install failed')"; \
+    R --no-save --no-restore -e "options(repos=c(CRAN='https://cloud.r-project.org')); remotes::install_local('/tmp/spieceasi.tar.gz', dependencies=TRUE, upgrade='never'); if(!requireNamespace('SpiecEasi', quietly=TRUE)) stop('SpiecEasi install failed')"; \
     rm -f /tmp/spieceasi.tar.gz
 RUN R --no-save --no-restore -e "if(!requireNamespace('BiocManager',quietly=TRUE)) install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install(c('Biostrings','DECIPHER'), ask=FALSE, update=FALSE)"
 RUN R --no-save --no-restore -e "pkgs<-c('ggplot2','Biostrings','DECIPHER','vegan','changepoint','magick','here','data.table','irr','ape','igraph','microeco','SpiecEasi'); m<-pkgs[!sapply(pkgs,requireNamespace,quietly=TRUE)]; if(length(m)>0) stop(paste('Missing:',paste(m,collapse=', '))); message('All packages verified OK')"
