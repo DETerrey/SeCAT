@@ -718,6 +718,7 @@ get_otu_tab_from_uc <- function(otu_table, uc_file) {
   otutable_n <- otutable_n %>%
     dplyr::left_join(otu_lookup, by = c("target_clean" = "OTU_clean")) %>%
     dplyr::left_join(uc_concat, by = "target_clean") %>%
+    dplyr::mutate(OTU = dplyr::coalesce(as.character(OTU), target_clean)) %>%
     dplyr::select(-target_clean)  # Remove temporary column.
 
   # Diagnostic reporting.
