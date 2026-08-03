@@ -795,6 +795,7 @@ generate_alpha_diversity_summary_one_study <- function(study_data, verdicts_row)
     numeric_cols <- names(otu_table)[sapply(otu_table, is.numeric)]
     if(length(numeric_cols) == 0) return(list(Observed = 0, Shannon = 0))
     vegan_otu_table <- t(otu_table[, numeric_cols, drop = FALSE])
+    vegan_otu_table[is.na(vegan_otu_table)] <- 0
     if (sum(vegan_otu_table) == 0) return(list(Observed = 0, Shannon = 0))
     return(list(Observed = mean(vegan::specnumber(vegan_otu_table)), Shannon = mean(vegan::diversity(vegan_otu_table, index = "shannon"))))
   }
