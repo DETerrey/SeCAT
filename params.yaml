@@ -43,7 +43,7 @@ reference_db: "/home/users/dterrey/secat_data/references/SILVA_138.2_SSURef_NR99
 # Mounted into the Singularity/Docker container so it can read them.
 #   bind_paths: "/data/my_project"              # one folder holds everything
 #   bind_paths: "/data/studies,/refs/silva"     # data in several places
-bind_paths: "/home/users/dterrey/SeCAT_AlessiaTest/Data_David,/home/users/dterrey/secat_data"
+bind_paths: "/home/users/dterrey/SeCAT_AlessiaTest/Data_David,/home/users/dterrey/secat_data,/work/scratch-nopw2/dterrey"
 
 # ==============================================================================
 # OUTPUT DIRECTORY
@@ -51,7 +51,7 @@ bind_paths: "/home/users/dterrey/SeCAT_AlessiaTest/Data_David,/home/users/dterre
 
 # Root output directory. All results, intermediate files, and reports are
 # written to subdirectories beneath this path.
-outdir: "output"
+outdir: "/work/scratch-nopw2/dterrey/secat_output"
 
 # ==============================================================================
 # ANALYSIS MODE
@@ -259,7 +259,21 @@ changepoint_penalty_method:     "MANUAL"
 #   flags smaller shifts but increases false positive rate. Note: this
 #   params.yaml sets 50; nextflow.config defaults to 1. The params.yaml
 #   value takes precedence when using -params-file.
+# NOTE: LEGACY. This value does NOT affect the published verdicts; it is read
+# only by the older calculate_changepoint_thresholds() path. Verdict thresholds
+# come from the bootstrap CV scan configured below.
 changepoint_penalty_multiplier: 50
+
+# --- Changepoint bootstrap CV scan (drives the verdicts) ---
+# The penalty multiplier is scanned over seq(min, max, by); for each value the
+# changepoint is re-estimated over `bootstrap_n` resamples, and the most stable
+# multiplier is selected per study and per taxonomic level. Penalty = m * log(n).
+# Data impact: raising scan_min (or the whole range) makes detection more
+# conservative (fewer changepoints); lowering it flags smaller shifts.
+changepoint_scan_min:           0.4
+changepoint_scan_max:           2.4
+changepoint_scan_by:            0.1
+changepoint_bootstrap_n:        50
 
 # ==============================================================================
 # NULL MODEL COMPARISON

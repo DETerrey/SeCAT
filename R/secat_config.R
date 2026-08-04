@@ -205,6 +205,9 @@ CORE_PREVALENCE_THRESHOLD     <- 0.90
 #   Default calibrated via testing for optimal Type I error control.
 CHANGEPOINT_PENALTY_METHOD    <- .secat_env("SECAT_CHANGEPOINT_METHOD",      "MANUAL")
 
+# LEGACY / NOT USED BY THE VERDICT PATH.
+# Consumed only by calculate_changepoint_thresholds() in secat_utils.R. The
+# published verdicts use the bootstrap CV scan below, which ignores this value.
 # Multiplier applied to the MANUAL penalty (penalty = multiplier * var(data)).
 # Valid values: positive numeric (0.1-100; 1 = baseline).
 # Data impact: increasing makes PELT less sensitive (fewer changepoints,
@@ -212,6 +215,19 @@ CHANGEPOINT_PENALTY_METHOD    <- .secat_env("SECAT_CHANGEPOINT_METHOD",      "MA
 #   sensitive (flags smaller shifts, higher false positive rate).
 #   Default calibrated via testing for optimal Type I error control.
 CHANGEPOINT_PENALTY_MULTIPLIER <- .secat_env("SECAT_CHANGEPOINT_MULTIPLIER", 1,   "numeric")
+
+# --- Changepoint bootstrap CV scan (THIS is what drives the verdicts) -------
+# Verdict thresholds come from select_changepoint_penalty_cv() in 07_aggregate.R,
+# which does NOT use CHANGEPOINT_PENALTY_MULTIPLIER. Instead it scans a range of
+# penalty multipliers and picks, per study and per taxonomic level, the value
+# whose bootstrap changepoint location is most stable. These parameters control
+# that scan. Penalty at multiplier m = m * log(n).
+CHANGEPOINT_SCAN_MIN          <- .secat_env("SECAT_CHANGEPOINT_SCAN_MIN",  0.4, "numeric")
+CHANGEPOINT_SCAN_MAX          <- .secat_env("SECAT_CHANGEPOINT_SCAN_MAX",  2.4, "numeric")
+CHANGEPOINT_SCAN_BY           <- .secat_env("SECAT_CHANGEPOINT_SCAN_BY",   0.1, "numeric")
+CHANGEPOINT_BOOTSTRAP_N       <- .secat_env("SECAT_CHANGEPOINT_BOOTSTRAP_N", 50, "integer")
+CHANGEPOINT_BOOTSTRAP_SCAN    <- seq(CHANGEPOINT_SCAN_MIN, CHANGEPOINT_SCAN_MAX,
+                                     by = CHANGEPOINT_SCAN_BY)
 
 # ==============================================================================
 # SECTION 8: NULL MODEL COMPARISON
