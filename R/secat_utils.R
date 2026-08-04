@@ -697,6 +697,19 @@ get_otu_tab_from_uc <- function(otu_table, uc_file) {
     dplyr::group_by(target_clean) %>%
     dplyr::summarise(Group = stringr::str_c(query_clean, collapse = ""), .groups = 'drop')
 
+  # Map each centroid to a REPRESENTATIVE study ASV drawn from its own cluster.
+  # A trimmed sequence can re-cluster onto a reference centroid that is not itself
+  # one of this study's ASVs; joining such a centroid against otu_lookup yields NA,
+  # which silently renames the row and destroys taxon identity across trim steps
+  # (retention then reports 0% even though the counts are intact).
+  centroid_rep <- uc_cleaned %>%
+    dplyr::group_by(target_clean) %>%
+    dplyr::summarise(rep_clean = dplyr::first(query_clean), .groups = 'drop') %>%
+    dplyr::left_join(
+      dplyr::select(otu_lookup, OTU_clean, rep_OTU = OTU, rep_taxonomy = taxonomy),
+      by = c("rep_clean" = "OTU_clean")
+    )
+
   # Get sample column names BEFORE adding temporary columns.
   # This is robust to non-standard column names in the OTU table.
   sample_cols <- names(otu_table)[sapply(otu_table, is.numeric)]
@@ -718,8 +731,13 @@ get_otu_tab_from_uc <- function(otu_table, uc_file) {
   otutable_n <- otutable_n %>%
     dplyr::left_join(otu_lookup, by = c("target_clean" = "OTU_clean")) %>%
     dplyr::left_join(uc_concat, by = "target_clean") %>%
-    dplyr::mutate(OTU = dplyr::coalesce(as.character(OTU), target_clean)) %>%
-    dplyr::select(-target_clean)  # Remove temporary column.
+    dplyr::left_join(centroid_rep, by = "target_clean") %>%
+    # Preserve taxon identity: own name -> representative member ASV -> centroid ID.
+    dplyr::mutate(
+      OTU      = dplyr::coalesce(as.character(OTU), as.character(rep_OTU), target_clean),
+      taxonomy = dplyr::coalesce(as.character(taxonomy), as.character(rep_taxonomy))
+    ) %>%
+    dplyr::select(-target_clean, -rep_clean, -rep_OTU, -rep_taxonomy)
 
   # Diagnostic reporting.
   if (nrow(otutable_n) == 0) {
@@ -775,7 +793,15 @@ sync_data_for_study <- function(job_info) {
   if (!file.exists(asv_counts_path)) stop("FATAL: ASV Counts file not found at: ", asv_counts_path)
 
   message("  -> Loading feature table and FASTA file...")
-  real_counts_raw <- readr::read_tsv(asv_counts_path, show_col_types = FALSE, skip = 1)
+  # Detect whether line 1 is a bare comment (QIIME2/BIOM) or the header itself.
+  # Blindly skipping line 1 consumes a real header, promotes the first ASV's counts
+  # to column names, drops that ASV, and creates duplicate "0" columns whose
+  # positional name-repair suffixes shift between trim steps -> NA cells -> 0% retention.
+  .first_line <- readLines(asv_counts_path, n = 1L, warn = FALSE)
+  .skip_n <- if (length(.first_line) == 1L &&
+                 startsWith(.first_line, "#") &&
+                 !grepl("\t", .first_line)) 1L else 0L
+  real_counts_raw <- readr::read_tsv(asv_counts_path, show_col_types = FALSE, skip = .skip_n)
   real_sequences_raw <- Biostrings::readDNAStringSet(asv_fasta_path)
   message("  -> Synchronizing IDs between feature table and FASTA...")
 
@@ -1415,7 +1441,8 @@ calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, incre
   all_retention <- list()
   
   for (level in get_levels()) {
-    retention_values <- numeric(num_steps)
+    # NA = not measured; 0 = measured and genuinely empty.
+    retention_values <- rep(NA_real_, num_steps)
     
     # Get the initial (untrimmed) reference table
     initial_table <- otu_tables_per_level[["0"]][[level]]
@@ -1427,7 +1454,7 @@ calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, incre
       sample_cols <- names(initial_table)[sapply(initial_table, is.numeric)]
       
       if(length(sample_cols) > 0) {
-        nonzero_mask <- rowSums(initial_table[, sample_cols, drop = FALSE]) > 0
+        nonzero_mask <- rowSums(initial_table[, sample_cols, drop = FALSE], na.rm = TRUE) > 0
         initial_taxa <- initial_table[[level]][nonzero_mask]
         initial_taxa <- initial_taxa[!is.na(initial_taxa) & initial_taxa != ""]
         n_initial <- length(initial_taxa)
@@ -1436,13 +1463,18 @@ calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, incre
           trim_key <- as.character(step * increment)
           trimmed_table <- otu_tables_per_level[[trim_key]][[level]]
           
-          if (is.null(trimmed_table) || nrow(trimmed_table) == 0) {
+          if (is.null(trimmed_table)) {
+            # No table for this step = NO DATA, not total loss. Recording 0 here
+            # plots as a vertical collapse and can trigger a spurious
+            # retention-floor HARD_FAIL.
+            retention_values[step] <- NA_real_
+          } else if (nrow(trimmed_table) == 0) {
             retention_values[step] <- 0
           } else {
             # Filter to taxa with nonzero abundance in any sample
             t_sample_cols <- names(trimmed_table)[sapply(trimmed_table, is.numeric)]
             if(length(t_sample_cols) > 0) {
-              t_nonzero_mask <- rowSums(trimmed_table[, t_sample_cols, drop = FALSE]) > 0
+              t_nonzero_mask <- rowSums(trimmed_table[, t_sample_cols, drop = FALSE], na.rm = TRUE) > 0
               retained_taxa <- trimmed_table[[level]][t_nonzero_mask]
               retained_taxa <- retained_taxa[!is.na(retained_taxa) & retained_taxa != ""]
               
