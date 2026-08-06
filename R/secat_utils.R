@@ -285,7 +285,7 @@ find_degradation_point <- function(real_curve, sim_dissim_data, sim_dissim_basel
 #   Requires: Biostrings (>= 2.60.0).
 # ------------------------------------------------------------------------------
 
-get_community <- function(db_seq, ntaxas = 100, seed = NULL) {
+get_community <- function(db_seq, ntaxas = 100, seed = NULL, community_seqs = NULL) {
 
   if (!is.null(seed)) set.seed(seed)
 
@@ -300,11 +300,15 @@ get_community <- function(db_seq, ntaxas = 100, seed = NULL) {
     stop(paste("Insufficient sequences in reference database:", n_available))
   }
 
-  message(sprintf("  -> Sampling %d taxa from %d reference sequences", ntaxas, n_available))
-
-  # Random unbiased sample
-  sampled_indices <- sample(seq_along(db_seq), ntaxas, replace = FALSE)
-  community_seqs <- db_seq[sampled_indices]
+  if (!is.null(community_seqs)) {
+    # Pre-built community (e.g. structure-matched null): skip random sampling.
+    ntaxas <- length(community_seqs)
+    message(sprintf("  -> Using supplied community of %d taxa (structure-matched)", ntaxas))
+  } else {
+    message(sprintf("  -> Sampling %d taxa from %d reference sequences", ntaxas, n_available))
+    sampled_indices <- sample(seq_along(db_seq), ntaxas, replace = FALSE)
+    community_seqs <- db_seq[sampled_indices]
+  }
 
   # EXTRACT TAXONOMY FROM SILVA HEADERS
   # SILVA format: ">Accession.start.end Taxonomy_string"
@@ -2142,3 +2146,149 @@ run_trim_analysis <- function(sequences, vsearch_path, output_dir, num_steps = 3
 }
 
 # =====================================================================
+
+
+# ------------------------------------------------------------------------------
+# Function: measure_community_structure
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Measure the sequence-similarity structure of one study's aligned ASVs. This
+#   is the expensive step (pairwise distances, O(n^2)) and is run ONCE per study
+#   in PREPARE_SIMS; simulation replicates consume the cached result.
+#
+#   Subsampling biases this estimate downward -- measured on PRJEB50983, the
+#   fraction of taxa with a >=97% neighbour reads 0.25 at n=100, 0.37 at n=300
+#   and 0.66 at n=900 -- so max_template should be as large as runtime allows.
+#
+# Returns: [list] win_start, win_end, var_profile, nn_identity, close_ids,
+#                 fam_sizes, n_template, n_total
+# ------------------------------------------------------------------------------
+measure_community_structure <- function(template_aln, cluster_id = 0.97,
+                                        max_template = 1500L) {
+  if (is.null(template_aln) || length(template_aln) < 2)
+    stop("measure_community_structure: template alignment missing or too small.")
+  n_total <- length(template_aln)
+  tpl <- template_aln
+  if (length(tpl) > max_template) tpl <- tpl[sample(seq_along(tpl), max_template)]
+  if (length(tpl) < 50)
+    message(sprintf("  -> [WARN] only %d template sequences; structure estimates will be noisy.",
+                    length(tpl)))
+
+  cm       <- Biostrings::consensusMatrix(tpl, as.prob = FALSE)
+  bases    <- intersect(rownames(cm), c("A", "C", "G", "T"))
+  occupied <- which(colSums(cm[bases, , drop = FALSE]) > 0)
+  if (length(occupied) < 50)
+    stop("measure_community_structure: template occupies too few columns.")
+
+  sub_cm <- cm[bases, occupied, drop = FALSE]
+  col_n  <- colSums(sub_cm)
+  ent <- vapply(seq_len(ncol(sub_cm)), function(j) {
+    if (col_n[j] < 2) return(0)
+    p <- sub_cm[, j] / col_n[j]; p <- p[p > 0]
+    -sum(p * log(p))
+  }, numeric(1))
+  if (sum(ent) <= 0) ent <- rep(1, length(ent))
+
+  dmat <- as.matrix(DECIPHER::DistanceMatrix(tpl, verbose = FALSE,
+                                             includeTerminalGaps = TRUE))
+  idm <- 1 - dmat; diag(idm) <- NA_real_
+  nn_identity <- apply(idm, 1, max, na.rm = TRUE)
+  nn_identity <- nn_identity[is.finite(nn_identity)]
+  close_ids   <- nn_identity[nn_identity >= cluster_id]
+  if (length(close_ids) == 0) close_ids <- cluster_id
+
+  adj <- idm >= cluster_id; adj[is.na(adj)] <- FALSE
+  n_t <- nrow(adj); comp <- integer(n_t); cid <- 0L
+  for (i in seq_len(n_t)) {
+    if (comp[i] != 0L) next
+    cid <- cid + 1L; stack <- i
+    while (length(stack)) {
+      v <- stack[1]; stack <- stack[-1]
+      if (comp[v] != 0L) next
+      comp[v] <- cid
+      stack <- c(stack, which(adj[v, ] & comp == 0L))
+    }
+  }
+  fam_sizes <- as.integer(table(comp))
+  message(sprintf("  -> Structure: %d/%d taxa measured, %d families (mean %.2f), %.0f%% with a >=%.0f%% neighbour",
+                  length(tpl), n_total, length(fam_sizes), mean(fam_sizes),
+                  100 * mean(nn_identity >= cluster_id), 100 * cluster_id))
+  list(win_start = min(occupied), win_end = max(occupied),
+       occupied = occupied, var_profile = ent / sum(ent),
+       nn_identity = nn_identity, close_ids = close_ids,
+       fam_sizes = fam_sizes, n_template = length(tpl), n_total = n_total)
+}
+
+# ------------------------------------------------------------------------------
+# Function: build_structure_matched_community
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Build a NULL community from INDEPENDENT reference sequences that reproduces a
+#   study's amplicon window, family-size distribution and within-family divergence
+#   (from measure_community_structure). Cheap: no pairwise distances.
+#
+#   The default null (uniform random reference draw) is phylogenetically dispersed
+#   -- measured on PRJEB22038_PE, 0% of its taxa have a >=97% neighbour vs ~59% in
+#   the real community -- so trimming cannot merge anything and the null-model
+#   p-value saturates at its floor.
+#
+#   ntaxas may be set below the study's ASV count to save runtime: families are
+#   emitted whole, so per-taxon structure is preserved (unlike subsampling taxa,
+#   which separates relatives and destroys it).
+# ------------------------------------------------------------------------------
+build_structure_matched_community <- function(db_seq, structure, ntaxas, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  W <- unique(Biostrings::width(db_seq))
+  if (length(W) != 1L)
+    stop("build_structure_matched_community: reference pool is not fixed-width.")
+
+  occupied  <- structure$occupied
+  vprof     <- structure$var_profile
+  close_ids <- structure$close_ids
+  fam_sizes <- structure$fam_sizes
+  ws <- structure$win_start; we <- structure$win_end
+  blank <- strsplit(paste(rep("-", W), collapse = ""), "", fixed = TRUE)[[1]]
+
+  mutate_in_window <- function(ch, target_identity) {
+    pos <- occupied[ch[occupied] %in% c("A", "C", "G", "T")]
+    if (length(pos) == 0) return(ch)
+    n_mut <- min(max(1L, round(length(pos) * (1 - target_identity))), length(pos))
+    w <- vprof[match(pos, occupied)]
+    if (sum(w) <= 0) w <- rep(1, length(pos))
+    for (i in sample(pos, n_mut, replace = FALSE, prob = w))
+      ch[i] <- sample(setdiff(c("A", "C", "G", "T"), ch[i]), 1L)
+    ch
+  }
+
+  seed_idx <- sample(seq_along(db_seq), min(length(db_seq), ntaxas))
+  # Inherit each seed's SILVA taxonomy: get_community() parses it from the header
+  # (everything after the first space). Without it every taxon becomes "Unknown",
+  # the community collapses to one taxon at Phylum..Genus, and simulated
+  # dissimilarity is identically zero at all levels above ASV.
+  db_names <- names(db_seq)
+  tax <- character(ntaxas)
+  out <- vector("list", ntaxas); k <- 0L; si <- 1L
+  while (k < ntaxas && si <= length(seed_idx)) {
+    s_ch <- strsplit(as.character(db_seq[[seed_idx[si]]]), "", fixed = TRUE)[[1]]
+    si <- si + 1L
+    .h <- if (!is.null(db_names)) db_names[seed_idx[si - 1L]] else ""
+    .tax <- sub("^[^ ]+[ ]*", "", .h)
+    if (!nzchar(.tax)) .tax <- "Bacteria;Unknown;Unknown;Unknown;Unknown;Unknown;Unknown"
+    keep <- blank; keep[ws:we] <- s_ch[ws:we]
+    k <- k + 1L; out[[k]] <- keep; tax[k] <- .tax
+    fam <- sample(fam_sizes, 1L)
+    if (fam > 1L) for (m in seq_len(fam - 1L)) {
+      if (k >= ntaxas) break
+      k <- k + 1L
+      out[[k]] <- mutate_in_window(keep, sample(close_ids, 1L)); tax[k] <- .tax
+    }
+  }
+  while (k < ntaxas) {
+    k <- k + 1L; .j <- sample.int(k - 1L, 1L)
+    out[[k]] <- mutate_in_window(out[[.j]], sample(close_ids, 1L)); tax[k] <- tax[.j]
+  }
+  res <- Biostrings::DNAStringSet(vapply(out[seq_len(ntaxas)],
+                                         paste, character(1), collapse = ""))
+  names(res) <- sprintf("NULL_%04d %s", seq_len(ntaxas), tax[seq_len(ntaxas)])
+  res
+}

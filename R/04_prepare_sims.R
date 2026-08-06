@@ -410,6 +410,30 @@ main <- function() {
         readr::write_csv(consensus_info, consensus_path)
         log_and_flush(sprintf("✓ Saved consensus region info to %s", consensus_path))
 
+        # --- Null-model structure: measured ONCE per study, cached for the sims ---
+        # The pairwise distance matrix is O(n^2); running it inside every
+        # simulation replicate repeats identical work ~100x per study.
+        if (!exists("measure_community_structure"))
+          source(file.path(Sys.getenv("SECAT_PROJECTDIR", getwd()), "R/secat_utils.R"))
+        .aln_files <- list.files(".", pattern = "_aligned\\.fasta$", full.names = TRUE)
+        if (length(.aln_files) == 0)
+          .aln_files <- list.files(file.path(OUTDIR, "intermediate", "aligned_fastas"),
+                                   pattern = "_aligned\\.fasta$", full.names = TRUE)
+        .max_tpl <- if (exists("SIM_MAX_TEMPLATE")) SIM_MAX_TEMPLATE else 1500L
+        .cid     <- if (exists("SIM_CLUSTER_IDENTITY")) SIM_CLUSTER_IDENTITY else 0.97
+        .structures <- list()
+        for (.f in .aln_files) {
+          .sn <- sub("_aligned\\.fasta$", "", basename(.f))
+          log_and_flush(paste("  -> Measuring null structure for", .sn))
+          .res <- tryCatch(
+            measure_community_structure(Biostrings::readDNAStringSet(.f),
+                                        cluster_id = .cid, max_template = .max_tpl),
+            error = function(e) { log_and_flush(paste("     [WARN]", conditionMessage(e))); NULL })
+          if (!is.null(.res)) .structures[[.sn]] <- .res
+        }
+        saveRDS(.structures, "null_structure.rds")
+        log_and_flush(sprintf("✓ Saved null structure for %d studies", length(.structures)))
+
         # Log consensus details for pipeline traceability
         if (!is.null(consres$start)) {
             log_and_flush(sprintf("  Consensus: %d-%d bp (%d studies)",

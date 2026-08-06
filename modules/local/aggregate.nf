@@ -49,6 +49,7 @@ process AGGREGATE {
     export SECAT_ANALYSIS_MODE="${params.analysis_mode}"
     export SECAT_CHANGEPOINT_METHOD="${params.changepoint_penalty_method}"
     export SECAT_CHANGEPOINT_MULTIPLIER="${params.changepoint_penalty_multiplier}"
+    export SECAT_CHANGEPOINT_SEED="${params.changepoint_seed}"
     export SECAT_CHANGEPOINT_SCAN_MIN="${params.changepoint_scan_min}"
     export SECAT_CHANGEPOINT_SCAN_MAX="${params.changepoint_scan_max}"
     export SECAT_CHANGEPOINT_SCAN_BY="${params.changepoint_scan_by}"

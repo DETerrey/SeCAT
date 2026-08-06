@@ -270,6 +270,26 @@ changepoint_penalty_multiplier: 50
 # multiplier is selected per study and per taxonomic level. Penalty = m * log(n).
 # Data impact: raising scan_min (or the whole range) makes detection more
 # conservative (fewer changepoints); lowering it flags smaller shifts.
+# --- Null-model community construction ---
+# false = legacy uniform random draw from the reference DB. Measured on
+# PRJEB22038_PE that null has 0% of taxa with a >=97% neighbour vs ~59% in the
+# real community, so trimming cannot merge anything and the null-model p-value
+# saturates at its floor. true = build the null from independent reference
+# sequences matched to the study's amplicon window, family-size structure and
+# within-family divergence.
+sim_structure_matched_null:     true
+sim_cluster_identity:           0.97
+# Template size for measuring study structure (once per study, not per replicate).
+# Subsampling biases the estimate downward, so keep this as high as runtime allows.
+sim_max_template:               1500
+# Community size for the legacy null. The matched null uses the study's ASV count.
+# 0 = match each study's ASV count. A positive value caps the null community to
+# save runtime; whole families are kept, so per-taxon structure is preserved.
+simulation_community_size:      0
+
+# Base seed for the changepoint bootstrap CV (combined with study + level).
+# Without it, verdicts are not reproducible between identical runs.
+changepoint_seed:               10010
 changepoint_scan_min:           0.4
 changepoint_scan_max:           2.4
 changepoint_scan_by:            0.1

@@ -1016,6 +1016,13 @@ main <- function() {
     study_verdicts <- list()
     for (level in get_levels()) {
       level_dissim <- real_curve %>% dplyr::filter(Level == level)
+      # Deterministic per-study/level seed. The CV bootstrap resamples with
+      # sample.int(); unseeded, identical inputs give different changepoints and
+      # therefore different verdicts between runs. Deriving the seed from study
+      # and level keeps replicates independent but fully reproducible.
+      .cp_seed <- (if (exists("CHANGEPOINT_SEED")) CHANGEPOINT_SEED else 10010L) +
+                  sum(utf8ToInt(paste0(study_name, "|", level)))
+      set.seed(.cp_seed)
       cp_info    <- select_changepoint_penalty_cv(y = level_dissim$Dissimilarity, trim_bp = level_dissim$Trim_BP,
                                                   penalty_method = penalty_method, scan = penalty_scan,
                                                   nboot = bootstrap_n, min_trim_bp = 10)

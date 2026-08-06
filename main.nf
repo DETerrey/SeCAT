@@ -132,7 +132,8 @@ workflow {
     PREPARE_SIMS(
         collected_coords,
         params.reference_db,
-        clean_manifest
+        clean_manifest,
+        STUDY_MAPPING.out.aligned_fasta.map { it[1] }.collect()
     )
 
     indexed_studies_with_aln_ch = indexed_studies_ch
@@ -156,7 +157,8 @@ workflow {
         sim_tasks_ch,
         PREPARE_SIMS.out.sim_reference_subset.first(),
         collected_coords,
-        PREPARE_SIMS.out.consensus_info
+        PREPARE_SIMS.out.consensus_info,
+        PREPARE_SIMS.out.null_structure.first()
     )
 
     all_real_results_ch = ANALYSE_REAL.out.results_rds.collect()
