@@ -842,9 +842,28 @@ sync_data_for_study <- function(job_info) {
     }, error = function(e) { NULL })
 
     if (!is.null(taxonomy_data)) {
-        # Auto-detect standard ID and taxonomy column names.
+        # Auto-detect the ID column; fall back to the first column, which
+        # load_table_robust()/read_tsv already place as the feature ID.
         id_col <- intersect(c("Feature ID", "ASV_ID", "#OTU ID", "OTU"), names(taxonomy_data))[1]
+        if (is.na(id_col)) id_col <- names(taxonomy_data)[1]
+
+        # Detect the lineage column by NAME first, then by CONTENT. Matching on
+        # name alone silently dropped taxonomy for any file using a non-standard
+        # header (e.g. "Assignation"), collapsing every rank to ASV IDs.
         tax_col <- intersect(c("Taxon", "Taxonomy", "Classification", "Lineage"), names(taxonomy_data))[1]
+        if (is.na(tax_col)) {
+            .cand <- setdiff(names(taxonomy_data), id_col)
+            .looks <- vapply(.cand, function(cc) {
+                v <- as.character(taxonomy_data[[cc]])
+                v <- v[!is.na(v) & nzchar(v)]
+                if (!length(v)) return(FALSE)
+                mean(grepl(";|[dkpcofgs]__", v)) > 0.5
+            }, logical(1))
+            if (any(.looks)) {
+                tax_col <- .cand[which(.looks)[1]]
+                message(sprintf("  -> Taxonomy column detected by content: '%s'", tax_col))
+            }
+        }
 
         if (!is.na(id_col) && !is.na(tax_col)) {
             otu_table_real <- real_counts_synced %>%
@@ -853,6 +872,15 @@ sync_data_for_study <- function(job_info) {
                   taxonomy_data %>% dplyr::select(!!rlang::sym(id_col), !!rlang::sym(tax_col)) %>% dplyr::rename(OTU = !!rlang::sym(id_col), taxonomy = !!rlang::sym(tax_col)),
                   by = "OTU"
                 )
+            .n_tax <- sum(!is.na(otu_table_real$taxonomy) & grepl(";", otu_table_real$taxonomy))
+            if (.n_tax == 0) {
+                message("  -> [WARN] taxonomy file loaded but 0 features matched by ID.")
+                message("     Rank-level results will fall back to ASV IDs.")
+            } else {
+                message(sprintf("  -> Taxonomy joined for %d / %d features.", .n_tax, nrow(otu_table_real)))
+            }
+        } else {
+            message("  -> [WARN] taxonomy file present but no lineage column recognised.")
         }
     }
   }

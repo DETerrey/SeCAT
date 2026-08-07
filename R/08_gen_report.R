@@ -1616,7 +1616,7 @@ create_method_performance_plot <- function() {
 # Params:   study_name, primer — used to construct expected filename.
 # Returns:  logical.
 check_report_exists <- function(study_name, primer) {
-  file.exists(file.path(PER_STUDY_DIR, paste0("Report_Fixed_", study_name, "_", primer, ".pdf")))
+  file.exists(file.path(PER_STUDY_DIR, paste0("Report_", study_name, "_", primer, ".pdf")))
 }
 
 message("--- Processing studies with file existence checks ---")
@@ -1926,7 +1926,7 @@ if (!SKIP_INDIVIDUAL) {
             if (length(png_files_for_pdf) > 0) {
                 message(paste("  → Creating PDF with", length(png_files_for_pdf), "pages..."))
                 tryCatch({
-                    pdf_filename <- file.path(PER_STUDY_DIR, paste0("Report_Fixed_", study_name, "_", primer, ".pdf"))
+                    pdf_filename <- file.path(PER_STUDY_DIR, paste0("Report_", study_name, "_", primer, ".pdf"))
                     pdf(pdf_filename, width = PLOT_WIDTH, height = PLOT_HEIGHT, onefile = TRUE)
                     for (png_file in png_files_for_pdf) {
                         img <- png::readPNG(png_file)
