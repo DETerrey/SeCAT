@@ -16,6 +16,10 @@ process CLEAN_DATA {
     export SECAT_MANIFEST="${manifest}"
     export SECAT_OUTDIR="${absOutdir}"
     export SECAT_PROJECTDIR="${projectDir}"
+    # cache-bust: separator-agnostic sample ID matching
+    export SECAT_MIN_SAMPLE_DEPTH="${params.min_sample_depth}"
+    export SECAT_MIN_ASV_PREVALENCE="${params.min_asv_prevalence}"
+    export SECAT_MIN_ASV_READS="${params.min_asv_reads}"
     Rscript ${projectDir}/R/00_clean_data.R
 
     # Symlink cleaned manifest into work directory
