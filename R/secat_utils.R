@@ -2320,3 +2320,51 @@ build_structure_matched_community <- function(db_seq, structure, ntaxas, seed = 
   names(res) <- sprintf("NULL_%04d %s", seq_len(ntaxas), tax[seq_len(ntaxas)])
   res
 }
+
+# ---------------------------------------------------------------------------
+# normalise_taxonomy_columns(tax, study)
+# Coerce a taxonomy table to ASV_ID / Taxon / Confidence regardless of the
+# denoising tool that produced it (QIIME2, DADA2, mothur, vsearch, ...).
+#   1. Name match against known aliases (case- and punctuation-insensitive)
+#   2. Content sniff if names fail: a lineage column holds ';' or rank prefixes
+#   3. Confidence auto-scaled to 0-100 so downstream Confidence/100 is correct
+#      (QIIME2 emits 0-1, vsearch/blast emit 0-100)
+# Returns NULL if no lineage column can be identified.
+# ---------------------------------------------------------------------------
+normalise_taxonomy_columns <- function(tax, study = "") {
+  if (is.null(tax) || !ncol(tax)) return(NULL)
+  .canon <- function(x) gsub("[^a-z0-9]", "", tolower(x))
+
+  if (!"Taxon" %in% colnames(tax)) {
+    .al <- c("taxon","assignation","taxonomy","consensuslineage","lineage",
+             "classification","taxonomicassignment","tax","assignment")
+    hit <- which(.canon(colnames(tax)) %in% .al)
+    if (!length(hit)) {
+      looks <- vapply(seq_along(colnames(tax)), function(i) {
+        v <- as.character(tax[[i]]); v <- v[!is.na(v) & nzchar(v)]
+        if (!length(v)) return(FALSE)
+        mean(grepl(";|[dkpcofgs]__", v)) > 0.5
+      }, logical(1))
+      hit <- which(looks)
+    }
+    if (length(hit)) colnames(tax)[hit[1]] <- "Taxon" else return(NULL)
+  }
+
+  if (!"Confidence" %in% colnames(tax)) {
+    .al <- c("confidence","perident","pident","identity","percentidentity",
+             "bootstrap","score","conf")
+    hit <- which(.canon(colnames(tax)) %in% .al & colnames(tax) != "Taxon")
+    if (length(hit)) colnames(tax)[hit[1]] <- "Confidence"
+  }
+  if (!"Confidence" %in% colnames(tax)) {
+    tax$Confidence <- NA_real_
+  } else {
+    tax$Confidence <- suppressWarnings(as.numeric(tax$Confidence))
+  }
+
+  fin <- tax$Confidence[is.finite(tax$Confidence)]
+  if (length(fin) && max(fin) <= 1) tax$Confidence <- tax$Confidence * 100
+  tax$Confidence[!is.finite(tax$Confidence)] <- 0
+
+  tax
+}

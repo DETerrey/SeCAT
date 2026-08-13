@@ -404,6 +404,15 @@ for (study in successful_studies) {
 
     # Check metadata-feature table match
     ft_samples <- colnames(orig_counts)[-1]
+    .canon <- function(x) gsub("[-. ]+", "_", as.character(x))
+    if (sum(ft_samples %in% meta$SampleID) < length(ft_samples) * 0.5) {
+      .ftk <- setNames(ft_samples, .canon(ft_samples))
+      .hit <- .canon(meta$SampleID) %in% names(.ftk)
+      if (any(.hit)) {
+        meta$SampleID[.hit] <- .ftk[.canon(meta$SampleID)[.hit]]
+        cat(sprintf("  Reconciled %d metadata IDs to feature-table spelling\n", sum(.hit)))
+      }
+    }
     meta_samples <- meta$SampleID
 
     n_match <- sum(ft_samples %in% meta_samples)
@@ -465,12 +474,8 @@ for (study in successful_studies) {
 
   # Taxonomy
   orig_tax <- load_flexible_table(study_row$taxonomy_path[1], "ASV_ID")
-  if (!is.null(orig_tax)) {
-    .cn <- colnames(orig_tax)
-    if (!"Taxon" %in% .cn) { .a <- intersect(c("Assignation","Taxonomy","taxonomy"), .cn); if (length(.a)) colnames(orig_tax)[match(.a[1], .cn)] <- "Taxon" }
-    .cn <- colnames(orig_tax)
-    if (!"Confidence" %in% .cn) { .b <- intersect(c("per_ident","pident","confidence"), .cn); if (length(.b)) colnames(orig_tax)[match(.b[1], .cn)] <- "Confidence" }
-  }
+  if (!exists("normalise_taxonomy_columns")) source(here("R/secat_utils.R"))
+  orig_tax <- normalise_taxonomy_columns(orig_tax, study)
   if (!is.null(orig_tax) && "Taxon" %in% colnames(orig_tax)) {
     untrimmed_taxonomy[[study]] <- orig_tax
     cat(sprintf("  ✓ Taxonomy: %d ASVs\n", nrow(orig_tax)))
@@ -1046,6 +1051,7 @@ for (study in names(untrimmed_features)) {
 
   ft_renamed <- ft
   colnames(ft_renamed)[colnames(ft_renamed) != "ASV_ID"] <- new_sample_names
+  ft_renamed$ASV_ID <- paste0(study, "_", ft_renamed$ASV_ID)
   untrimmed_prefixed[[study]] <- ft_renamed
 
   # Track reads
@@ -1073,7 +1079,7 @@ for (col in names(untrimmed_feature_final)) {
 }
 
 # Combine taxonomy from all studies (deduplicate by ASV_ID)
-untrimmed_tax_final <- bind_rows(untrimmed_taxonomy) %>%
+untrimmed_tax_final <- bind_rows(all_tax_list) %>%
   distinct(ASV_ID, .keep_all = TRUE)
 
 untrimmed_total_reads <- sum(untrimmed_feature_final[, -1], na.rm = TRUE)

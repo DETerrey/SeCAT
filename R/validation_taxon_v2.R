@@ -1349,7 +1349,8 @@ for (taxa_level in TAXONOMIC_LEVELS) {
 
       # For each MetaASV, count how many studies it appears in (after mapping)
       hash_to_meta <- asv_map %>%
-        mutate(Hash = str_extract(Original_ID, "[0-9a-f]{32}$")) %>%
+        mutate(Hash = ifelse(grepl("[0-9a-f]{32}$", Original_ID),
+                             str_extract(Original_ID, "[0-9a-f]{32}$"), Original_ID)) %>%
         filter(!is.na(Hash)) %>%
         distinct(Hash, Meta_ID)
 
@@ -1379,8 +1380,10 @@ for (taxa_level in TAXONOMIC_LEVELS) {
 
       shared_rate_after <- mean(study_presence_after$n_studies >= 2, na.rm = TRUE)
 
-      share_pass <- shared_rate_after >= shared_rate_before ||
-              abs(shared_rate_after - shared_rate_before) < 0.005
+      share_pass <- isTRUE(shared_rate_after >= shared_rate_before) ||
+              isTRUE(abs(shared_rate_after - shared_rate_before) < 0.005)
+      if (!is.finite(shared_rate_before) || !is.finite(shared_rate_after))
+        cat("  ! Sharing rate undefined (ID mapping empty) - tier reported, not fatal\n")
       cat(sprintf("  MetaASVs shared across ≥2 studies: %.1f%% → %.1f%% %s\n",
                   100 * shared_rate_before, 100 * shared_rate_after,
                   if (share_pass) "[PASS: improved/stable]" else "[NOTE: decreased]"))

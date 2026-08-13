@@ -47,6 +47,8 @@ input:
     export SECAT_PROJECTDIR="${projectDir}"
     export SECAT_VALIDATION_LEVELS="${params.validation_levels ?: "ASV,Genus,Family"}"
 
+    # cache-bust: format-agnostic MetaASV join + NA-safe share_pass
+
     Rscript ${projectDir}/R/validation_taxon_v2.R \
         0 \
         FALSE \
