@@ -465,6 +465,12 @@ for (study in successful_studies) {
 
   # Taxonomy
   orig_tax <- load_flexible_table(study_row$taxonomy_path[1], "ASV_ID")
+  if (!is.null(orig_tax)) {
+    .cn <- colnames(orig_tax)
+    if (!"Taxon" %in% .cn) { .a <- intersect(c("Assignation","Taxonomy","taxonomy"), .cn); if (length(.a)) colnames(orig_tax)[match(.a[1], .cn)] <- "Taxon" }
+    .cn <- colnames(orig_tax)
+    if (!"Confidence" %in% .cn) { .b <- intersect(c("per_ident","pident","confidence"), .cn); if (length(.b)) colnames(orig_tax)[match(.b[1], .cn)] <- "Confidence" }
+  }
   if (!is.null(orig_tax) && "Taxon" %in% colnames(orig_tax)) {
     untrimmed_taxonomy[[study]] <- orig_tax
     cat(sprintf("  ✓ Taxonomy: %d ASVs\n", nrow(orig_tax)))
@@ -833,8 +839,10 @@ for (study in names(untrimmed_taxonomy)) {
 }
 
 # --- Step 3: Combine All Taxonomies ---
-all_tax <- bind_rows(all_tax_list) %>%
-  mutate(Confidence = as.numeric(Confidence))
+all_tax <- bind_rows(all_tax_list)
+if (!"Confidence" %in% names(all_tax)) all_tax$Confidence <- NA_real_
+all_tax <- all_tax %>% mutate(Confidence = suppressWarnings(as.numeric(Confidence)))
+all_tax$Confidence[is.na(all_tax$Confidence)] <- 0
 
 cat(sprintf("\n  Combined taxonomy: %d entries\n", nrow(all_tax)))
 
