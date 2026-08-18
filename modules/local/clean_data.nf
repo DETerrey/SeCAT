@@ -20,6 +20,7 @@ process CLEAN_DATA {
     export SECAT_MIN_SAMPLE_DEPTH="${params.min_sample_depth}"
     export SECAT_MIN_ASV_PREVALENCE="${params.min_asv_prevalence}"
     export SECAT_MIN_ASV_READS="${params.min_asv_reads}"
+    # cache-bust: integrated depth+abundance QC
     Rscript ${projectDir}/R/00_clean_data.R
 
     # Symlink cleaned manifest into work directory

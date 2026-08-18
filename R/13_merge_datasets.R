@@ -775,6 +775,7 @@ cat("--- TAXONOMY (Length-Weighted) ---\n")
 cat("  Step 1: Loading original sequence lengths...\n")
 
 original_lengths <- list()
+.orig_seq_sets <- list()
 
 for (study in names(untrimmed_features)) {
   study_row <- manifest %>% filter(study_name == study)
@@ -793,6 +794,7 @@ for (study in names(untrimmed_features)) {
     )
 
     original_lengths[[study]] <- lengths_df
+    .orig_seq_sets[[study]] <- unique(as.character(orig_seqs))
 
     cat(sprintf("    %s: %d sequences (%.0f bp mean)\n",
                 study, nrow(lengths_df), mean(lengths_df$Original_Length)))
@@ -824,6 +826,42 @@ if (length(original_lengths) == 0) {
               min(all_lengths$Original_Length),
               max(all_lengths$Original_Length),
               mean(all_lengths$Original_Length)))
+}
+
+# --- Cross-study feature sharing: untrimmed identity vs harmonised ------------
+# BEFORE: proportion of unique untrimmed sequences occurring in >= 2 studies.
+# AFTER:  proportion of MetaASVs contributed to by >= 2 studies.
+# These are directly comparable; the pre-trim baseline must be computed on
+# sequence identity, not on MetaASV membership (which is invariant to trimming).
+if (length(.orig_seq_sets) > 0) {
+  .tabb  <- table(unlist(.orig_seq_sets, use.names = FALSE))
+  .nb    <- length(.tabb)
+  .shb   <- sum(as.integer(.tabb) >= 2)
+  .studyof <- function(x) {
+    out <- rep(NA_character_, length(x))
+    for (s in successful_studies) {
+      i <- is.na(out) & startsWith(x, paste0(s, "_"))
+      out[i] <- s
+    }
+    out
+  }
+  .aft <- final_map %>%
+    mutate(Study = .studyof(Original_ID)) %>%
+    filter(!is.na(Study), !is.na(Meta_ID)) %>%
+    distinct(Meta_ID, Study) %>%
+    count(Meta_ID, name = "n_studies")
+  .na  <- nrow(.aft)
+  .sha <- sum(.aft$n_studies >= 2)
+  .rb  <- if (.nb > 0) .shb / .nb else NA_real_
+  .ra  <- if (.na > 0) .sha / .na else NA_real_
+  readr::write_csv(tibble::tibble(
+    metric = c("unique_features_before", "shared_features_before", "share_rate_before",
+               "unique_features_after",  "shared_features_after",  "share_rate_after",
+               "fold_change"),
+    value  = c(.nb, .shb, .rb, .na, .sha, .ra, .ra / .rb)
+  ), file.path(OUTPUT_DIR, "cross_study_sharing.csv"))
+  cat(sprintf("\n  Cross-study sharing: %.1f%% (%d/%d untrimmed seqs) -> %.1f%% (%d/%d MetaASVs), %.2fx\n",
+              100 * .rb, .shb, .nb, 100 * .ra, .sha, .na, .ra / .rb))
 }
 
 # --- Step 2: Prepare Taxonomy Tables ---

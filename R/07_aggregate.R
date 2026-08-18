@@ -978,6 +978,33 @@ main <- function() {
     log_and_flush("  -> No consensus file found. All studies treated as non-outliers.")
   }
 
+
+  # --- Auditable record of studies excluded before assessment -----------------
+  # Studies dropped by the mapping-QC gate never reach the verdict table, so
+  # without this file their exclusion is visible only as an absence. Written
+  # alongside the keep/exclude decisions rather than buried in supporting/.
+  .exc_path    <- file.path(AGGREGATED_DATA_DIR, "excluded_studies.csv")
+  .coords_path <- file.path(OUTDIR, "intermediate/study_alignment_coords.csv")
+  .exc <- tibble::tibble(study_name = character(0), stage_excluded = character(0),
+                         reason = character(0), metric = character(0),
+                         value = numeric(0), mapping_quality = character(0))
+  if (length(outlier_studies) > 0 && file.exists(.coords_path)) {
+    .cd <- suppressMessages(readr::read_csv(.coords_path, show_col_types = FALSE))
+    .cd <- .cd[.cd$study_name %in% outlier_studies, , drop = FALSE]
+    if (nrow(.cd) > 0) {
+      .exc <- tibble::tibble(
+        study_name      = .cd$study_name,
+        stage_excluded  = "mapping_qc (pre-assessment)",
+        reason          = "ASV alignment did not converge on a single window; excluded from the consensus region and from simulation, verdict and trimming stages",
+        metric          = "window_support",
+        value           = .cd$window_support,
+        mapping_quality = .cd$mapping_quality)
+    }
+  }
+  readr::write_csv(.exc, .exc_path)
+  log_and_flush(sprintf("  -> %d study(ies) excluded before assessment; recorded in %s",
+                        nrow(.exc), basename(.exc_path)))
+
   for (real_file in real_data_files) {
     current_study_data <- readRDS(real_file)
     study_name <- current_study_data$study_name

@@ -347,7 +347,22 @@ main <- function() {
         # Each study gets num_steps determined by its distance from the consensus
         # region. In scaled mode this is a fixed step count; in absolute mode
         # it depends on the study's actual amplicon length.
-        simulation_tasks <- study_coords %>%
+        # Mapping-QC gate: studies whose ASVs did not converge on a single window
+        # (mapping_quality == UNSTABLE) are dropped from the simulation/analysis
+        # set. They cannot be meaningfully compared against a consensus they do
+        # not reach, so they receive no null model, degradation verdict or report
+        # (they remain in study_alignment_coords.csv for provenance). Gated by the
+        # same flag that removes them from the consensus.
+        sim_study_coords <- study_coords
+        if (isTRUE(EXCLUDE_UNSTABLE_FROM_CONSENSUS) && "mapping_quality" %in% names(study_coords)) {
+            .unstable <- study_coords$study_name[study_coords$mapping_quality == "UNSTABLE"]
+            if (length(.unstable)) {
+                log_and_flush(sprintf("--- [MAP-QC] Dropping %d UNSTABLE study(ies) from simulation/analysis: %s",
+                                      length(.unstable), paste(.unstable, collapse = ", ")))
+                sim_study_coords <- study_coords[study_coords$mapping_quality != "UNSTABLE", , drop = FALSE]
+            }
+        }
+        simulation_tasks <- sim_study_coords %>%
             dplyr::mutate(
                 task_id = study_name,
                 num_steps = if (STEP_MODE == "scaled") {
@@ -372,14 +387,17 @@ main <- function() {
 
         # Exclude UNSTABLE-mapping studies from the consensus (they cannot define a
         # reliable shared region). Gated by EXCLUDE_UNSTABLE_FROM_CONSENSUS; excluded
-        # studies remain in simulations, trimming and all outputs.
+        # studies are also dropped from simulation/assessment (see MAP-QC gate above)
+        # and recorded in 3_verdicts/excluded_studies.csv.
         consensus_coords <- study_coords
+        .mapqc_excluded <- character(0)
         if (exists("EXCLUDE_UNSTABLE_FROM_CONSENSUS") && isTRUE(EXCLUDE_UNSTABLE_FROM_CONSENSUS) &&
             "mapping_quality" %in% names(study_coords)) {
           .drop <- which(study_coords$mapping_quality == "UNSTABLE")
           if (length(.drop) > 0 && length(.drop) < nrow(study_coords)) {
             log_and_flush(sprintf("--- [MAP-QC] Excluding %d UNSTABLE study(ies) from consensus: %s",
                                   length(.drop), paste(study_coords$study_name[.drop], collapse = ", ")))
+            .mapqc_excluded <- study_coords$study_name[.drop]
             consensus_coords <- study_coords[-.drop, , drop = FALSE]
           } else if (length(.drop) == nrow(study_coords)) {
             log_and_flush("--- [MAP-QC] WARNING: all studies UNSTABLE; using all for consensus.")
@@ -402,7 +420,7 @@ main <- function() {
           ConsensusLength = if(!is.null(consres$start)) (consres$end - consres$start) else 0,
           NumStudiesInConsensus = if(!is.null(consres$n_studies)) consres$n_studies else 0,
           IncludedStudies = if(!is.null(consres$included_studies)) paste(consres$included_studies, collapse = ";") else "",
-          OutlierStudies = if(!is.null(consres$excluded_studies)) paste(consres$excluded_studies, collapse = ";") else ""
+          OutlierStudies = paste(unique(c(if (!is.null(consres$excluded_studies)) consres$excluded_studies else character(0), .mapqc_excluded)), collapse = ";")
         )
 
         # Write consensus info for use by simulation workers and real-data analysis

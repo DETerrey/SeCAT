@@ -1365,6 +1365,15 @@ for (taxa_level in TAXONOMIC_LEVELS) {
         summarise(n_studies = n_distinct(StudyID), .groups = "drop")
 
       shared_rate_before <- mean(study_presence$n_studies >= 2, na.rm = TRUE)
+      .csf <- file.path(dirname(ASV_MAPPING), "cross_study_sharing.csv")
+      if (file.exists(.csf)) {
+        .cs <- readr::read_csv(.csf, show_col_types = FALSE)
+        .v  <- setNames(.cs$value, .cs$metric)
+        if (is.finite(.v[["share_rate_before"]])) {
+          shared_rate_before <- as.numeric(.v[["share_rate_before"]])
+          cat("  Baseline from untrimmed sequence identity (not MetaASV membership)\n")
+        }
+      }
 
       # After: MetaASVs are the direct rownames of otu_after
       otu_a_df <- dataset_after_asv$otu_table %>%
