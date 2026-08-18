@@ -16,6 +16,10 @@ input:
     path pre_meta,    stageAs: 'pre_metadata.tsv'
     path asv_mapping
     path aggregated_dir
+    path clean_manifest,  stageAs: 'clean_manifest.tsv'
+    path roster,          stageAs: 'roster.txt'
+    path consensus_info,  stageAs: 'consensus_info.csv'
+    path trim_summary_in, stageAs: 'trim_summary_in.csv'
 
     output:
     path "outputs/**",          emit: validation_outputs
@@ -42,6 +46,21 @@ input:
     # Stage SeCAT intermediate outputs for coordinate verification (Tier 0C)
     cp -r ${aggregated_dir}/* output/ 2>/dev/null || true
     cp ${asv_mapping} asv_mapping_final.tsv        2>/dev/null || true
+
+    # --- Tier 0 staging (previously missing; Tier 0A-0C were silently skipped) ---
+    # 0C inputs: consensus coordinates + trim summary at the paths the R expects
+    cp consensus_info.csv  output/intermediate/consensusregioninfo.csv   2>/dev/null || true
+    cp trim_summary_in.csv output/standardized_datasets/trim_summary.csv 2>/dev/null || true
+    # 0A/0B input: pre-consensus (cleaned, untrimmed) sequences, concatenated from
+    # the cleaned per-study FASTAs in the clean manifest, restricted to rostered
+    # studies where a roster is provided (falls back to all cleaned studies).
+    ROSTER=roster.txt; [ -f "\$ROSTER" ] || ROSTER=/dev/null
+    awk -F'\\t' 'NR==FNR { if (NF) r[\$1]=1; next }
+         FNR==1 { for(i=1;i<=NF;i++){ if(\$i=="asv_fasta_path") c=i; if(\$i=="study_name") s=i }; next }
+         c && \$c ~ /^\\// { if (!length(r) || r[\$s]) print \$c }' \
+        "\$ROSTER" clean_manifest.tsv \
+      | while read -r fa; do [ -f "\$fa" ] && cat "\$fa"; done > pre_consensus/sequences.fasta || true
+    [ -s pre_consensus/sequences.fasta ] || rm -f pre_consensus/sequences.fasta
 
     export SECAT_OUTDIR="."
     export SECAT_PROJECTDIR="${projectDir}"

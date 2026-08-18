@@ -1533,7 +1533,7 @@ tryCatch({
     net_b$cal_network(
       network_method   = "SpiecEasi",
       SpiecEasi_method = "mb",
-      pulsar.params    = list(rep.num = 50, ncores = min(4, ncores), seed = 10010)
+      pulsar.params    = list(rep.num = 50, ncores = 1, seed = 10010)
     )
     cat("  ✓ BEFORE network built (SPIEC-EASI)\n")
 
@@ -1545,7 +1545,7 @@ tryCatch({
     net_a$cal_network(
       network_method   = "SpiecEasi",
       SpiecEasi_method = "mb",
-      pulsar.params    = list(rep.num = 50, ncores = min(4, ncores), seed = 10010)
+      pulsar.params    = list(rep.num = 50, ncores = 1, seed = 10010)
     )
     cat("  ✓ AFTER network built (SPIEC-EASI)\n\n")
 

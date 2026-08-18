@@ -224,7 +224,11 @@ workflow {
                 MERGE_DATASETS.out.pre_tax,
                 MERGE_DATASETS.out.pre_meta.ifEmpty(file('NO_META')),
                 MERGE_DATASETS.out.asv_mapping.ifEmpty(file('NO_MAPPING')),
-                AGGREGATE.out.aggregated_dir
+                AGGREGATE.out.aggregated_dir,
+                clean_manifest,
+                Channel.value(file('NO_ROSTER')),
+                PREPARE_SIMS.out.consensus_info.first(),
+                TRIM_SEQUENCES.out.trim_summary
             )
         }
     } else {
@@ -277,7 +281,11 @@ workflow STANDARDIZE {
             MERGE_DATASETS.out.pre_tax,
             MERGE_DATASETS.out.pre_meta.ifEmpty(file('NO_META')),
             MERGE_DATASETS.out.asv_mapping.ifEmpty(file('NO_MAPPING')),
-            aggregated_dir
+            aggregated_dir,
+            file("${params.outdir}/cleaned_data/secat_manifest_clean.tsv", checkIfExists: true),
+            selected_file,
+            consensus_info,
+            TRIM_SEQUENCES.out.trim_summary
         )
     }
 }
