@@ -1350,7 +1350,7 @@ for (taxa_level in TAXONOMIC_LEVELS) {
       # For each MetaASV, count how many studies it appears in (after mapping)
       hash_to_meta <- asv_map %>%
         mutate(Hash = ifelse(grepl("[0-9a-f]{32}$", Original_ID),
-                             str_extract(Original_ID, "[0-9a-f]{32}$"), Original_ID)) %>%
+                             Original_ID, Original_ID)) %>%
         filter(!is.na(Hash)) %>%
         distinct(Hash, Meta_ID)
 
@@ -1577,6 +1577,8 @@ tryCatch({
     hub_thr <- quantile(deg_b, 0.90)
     hubs_b  <- names(deg_b[deg_b >= hub_thr])
     nodes_a <- igraph::V(g_a)$name
+    deg_a   <- igraph::degree(g_a)
+    hubs_a  <- names(deg_a[deg_a >= quantile(deg_a, 0.90)])
 
     if (taxa_level == "ASV" && file.exists(ASV_MAPPING)) {
       hub_map <- read_tsv(ASV_MAPPING, show_col_types = FALSE) %>%
@@ -1590,18 +1592,18 @@ tryCatch({
         cat("  ⚠ Hub nodes: none of the hub hashes found in mapping file\n")
         hub_retained <- NA_real_
       } else {
-        hub_retained <- mean(hubs_b_translated %in% nodes_a, na.rm = TRUE)
+        hub_retained <- mean(hubs_b_translated %in% hubs_a, na.rm = TRUE)
       }
       cat(sprintf("  Hub nodes retained (top 10%% degree, via MetaASV map): %d/%d (%.1f%%) %s\n",
-                  sum(hubs_b_translated %in% nodes_a), n_mappable,
+                  sum(hubs_b_translated %in% hubs_a), n_mappable,
                   100 * ifelse(is.na(hub_retained), 0, hub_retained),
                   if (!is.na(hub_retained) && hub_retained >= 0.80) "[PASS]"
                   else "[NOTE: hub loss > 20%]"))
     } else {
       # Genus / Family: names match directly
-      hub_retained <- mean(hubs_b %in% nodes_a, na.rm = TRUE)
+      hub_retained <- mean(hubs_b %in% hubs_a, na.rm = TRUE)
       cat(sprintf("  Hub nodes retained (top 10%% degree): %d/%d (%.1f%%) %s\n",
-                  sum(hubs_b %in% nodes_a), length(hubs_b),
+                  sum(hubs_b %in% hubs_a), length(hubs_b),
                   100 * hub_retained,
                   if (hub_retained >= 0.80) "[PASS]" else "[NOTE: hub loss > 20%]"))
     }
