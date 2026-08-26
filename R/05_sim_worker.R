@@ -242,11 +242,44 @@ USE_ALIGNMENT <- TRUE
 message("Step 1: Simulating realistic community from SILVA...")
 
 n_taxa <- if(exists("SIMULATION_COMMUNITY_SIZE")) SIMULATION_COMMUNITY_SIZE else 100
+# 0 means "match the study"; the random-draw fallback has no study to match, so use 100.
+if (!is.numeric(n_taxa) || n_taxa < 10) n_taxa <- 100
+
+# --- Structure-matched null (Option C) -------------------------------------
+# A uniform random SILVA draw has essentially no close relatives, so trimming
+# cannot merge taxa and the null is not a valid comparator. When enabled, build
+# a null community from INDEPENDENT reference sequences that reproduces this
+# study's amplicon window, family-size structure and within-family divergence.
+.use_matched <- if (exists("SIM_STRUCTURE_MATCHED_NULL")) isTRUE(SIM_STRUCTURE_MATCHED_NULL) else FALSE
+.tpl_path    <- Sys.getenv("SECAT_NULL_STRUCTURE", "")
+.matched_seqs <- NULL
+if (.use_matched && nzchar(.tpl_path) && file.exists(.tpl_path)) {
+  .all_struct <- readRDS(.tpl_path)
+  .struct <- .all_struct[[TASK_ID]]
+  if (is.null(.struct)) {
+    message("  -> [WARN] no cached structure for ", TASK_ID, "; using random draw.")
+  } else {
+  message("  -> Building STRUCTURE-MATCHED null community for ", TASK_ID,
+          sprintf(" (%d families, %.0f%% close)", length(.struct$fam_sizes),
+                  100 * mean(.struct$nn_identity >= 0.97)))
+  # Community size: study ASV count unless capped by simulation_community_size.
+  .cap <- if (exists("SIMULATION_COMMUNITY_SIZE")) SIMULATION_COMMUNITY_SIZE else 0L
+  n_taxa <- if (.cap > 0L) min(.cap, .struct$n_total) else .struct$n_total
+  .matched_seqs <- tryCatch(
+    build_structure_matched_community(db_seq = ref_db, structure = .struct,
+                                      ntaxas = n_taxa, seed = SEED),
+    error = function(e) { message("  -> [WARN] matched null failed (", conditionMessage(e),
+                                  "); falling back to random draw."); NULL })
+  }
+} else if (.use_matched) {
+  message("  -> [WARN] structure-matched null requested but no template alignment; using random draw.")
+}
 
 sim_community <- get_community(
   db_seq = ref_db,
   ntaxas = n_taxa,
-  seed = SEED
+  seed = SEED,
+  community_seqs = .matched_seqs
 )
 
 sim_sequences_raw <- sim_community$sequences

@@ -10,11 +10,13 @@ process PREPARE_SIMS {
     path study_coords
     val reference_db
     path clean_manifest
+    path aligned_fastas
 
     output:
     path "simulation_tasks.csv",              emit: sim_tasks_csv
     path "simulation_reference_subset.fasta", emit: sim_reference_subset
     path "consensusregioninfo.csv",           emit: consensus_info
+    path "null_structure.rds",                emit: null_structure, optional: true
     path "study_alignment_coords.csv",        emit: study_align_coords, optional: true
 
     script:
@@ -35,6 +37,11 @@ process PREPARE_SIMS {
     mkdir -p intermediate
     cp ${study_coords} ./intermediate/study_alignment_coords.csv
     export SECAT_PROJECTDIR="${projectDir}"
+    export SECAT_EXCLUDE_UNSTABLE="${params.exclude_unstable_from_consensus}"
+    export SECAT_SIM_MAX_TEMPLATE="${params.sim_max_template}"
+    export SECAT_SIM_CLUSTER_ID="${params.sim_cluster_identity}"
+    # cache-bust: null-structure measurement fix
+    # cache-bust: includeTerminalGaps fix
     Rscript ${projectDir}/R/04_prepare_sims.R
     cp ./intermediate/simulation_tasks.csv              ./simulation_tasks.csv
     cp ./intermediate/simulation_reference_subset.fasta ./simulation_reference_subset.fasta

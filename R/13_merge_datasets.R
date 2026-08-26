@@ -404,6 +404,15 @@ for (study in successful_studies) {
 
     # Check metadata-feature table match
     ft_samples <- colnames(orig_counts)[-1]
+    .canon <- function(x) gsub("[-. ]+", "_", as.character(x))
+    if (sum(ft_samples %in% meta$SampleID) < length(ft_samples) * 0.5) {
+      .ftk <- setNames(ft_samples, .canon(ft_samples))
+      .hit <- .canon(meta$SampleID) %in% names(.ftk)
+      if (any(.hit)) {
+        meta$SampleID[.hit] <- .ftk[.canon(meta$SampleID)[.hit]]
+        cat(sprintf("  Reconciled %d metadata IDs to feature-table spelling\n", sum(.hit)))
+      }
+    }
     meta_samples <- meta$SampleID
 
     n_match <- sum(ft_samples %in% meta_samples)
@@ -465,6 +474,8 @@ for (study in successful_studies) {
 
   # Taxonomy
   orig_tax <- load_flexible_table(study_row$taxonomy_path[1], "ASV_ID")
+  if (!exists("normalise_taxonomy_columns")) source(here("R/secat_utils.R"))
+  orig_tax <- normalise_taxonomy_columns(orig_tax, study)
   if (!is.null(orig_tax) && "Taxon" %in% colnames(orig_tax)) {
     untrimmed_taxonomy[[study]] <- orig_tax
     cat(sprintf("  ✓ Taxonomy: %d ASVs\n", nrow(orig_tax)))
@@ -764,6 +775,7 @@ cat("--- TAXONOMY (Length-Weighted) ---\n")
 cat("  Step 1: Loading original sequence lengths...\n")
 
 original_lengths <- list()
+.orig_seq_sets <- list()
 
 for (study in names(untrimmed_features)) {
   study_row <- manifest %>% filter(study_name == study)
@@ -782,6 +794,7 @@ for (study in names(untrimmed_features)) {
     )
 
     original_lengths[[study]] <- lengths_df
+    .orig_seq_sets[[study]] <- unique(as.character(orig_seqs))
 
     cat(sprintf("    %s: %d sequences (%.0f bp mean)\n",
                 study, nrow(lengths_df), mean(lengths_df$Original_Length)))
@@ -815,6 +828,42 @@ if (length(original_lengths) == 0) {
               mean(all_lengths$Original_Length)))
 }
 
+# --- Cross-study feature sharing: untrimmed identity vs harmonised ------------
+# BEFORE: proportion of unique untrimmed sequences occurring in >= 2 studies.
+# AFTER:  proportion of MetaASVs contributed to by >= 2 studies.
+# These are directly comparable; the pre-trim baseline must be computed on
+# sequence identity, not on MetaASV membership (which is invariant to trimming).
+if (length(.orig_seq_sets) > 0) {
+  .tabb  <- table(unlist(.orig_seq_sets, use.names = FALSE))
+  .nb    <- length(.tabb)
+  .shb   <- sum(as.integer(.tabb) >= 2)
+  .studyof <- function(x) {
+    out <- rep(NA_character_, length(x))
+    for (s in successful_studies) {
+      i <- is.na(out) & startsWith(x, paste0(s, "_"))
+      out[i] <- s
+    }
+    out
+  }
+  .aft <- final_map %>%
+    mutate(Study = .studyof(Original_ID)) %>%
+    filter(!is.na(Study), !is.na(Meta_ID)) %>%
+    distinct(Meta_ID, Study) %>%
+    count(Meta_ID, name = "n_studies")
+  .na  <- nrow(.aft)
+  .sha <- sum(.aft$n_studies >= 2)
+  .rb  <- if (.nb > 0) .shb / .nb else NA_real_
+  .ra  <- if (.na > 0) .sha / .na else NA_real_
+  readr::write_csv(tibble::tibble(
+    metric = c("unique_features_before", "shared_features_before", "share_rate_before",
+               "unique_features_after",  "shared_features_after",  "share_rate_after",
+               "fold_change"),
+    value  = c(.nb, .shb, .rb, .na, .sha, .ra, .ra / .rb)
+  ), file.path(OUTPUT_DIR, "cross_study_sharing.csv"))
+  cat(sprintf("\n  Cross-study sharing: %.1f%% (%d/%d untrimmed seqs) -> %.1f%% (%d/%d MetaASVs), %.2fx\n",
+              100 * .rb, .shb, .nb, 100 * .ra, .sha, .na, .ra / .rb))
+}
+
 # --- Step 2: Prepare Taxonomy Tables ---
 # Add study prefix to ASV IDs so they match the mapping table
 cat("\n  Step 2: Preparing taxonomy tables...\n")
@@ -833,8 +882,10 @@ for (study in names(untrimmed_taxonomy)) {
 }
 
 # --- Step 3: Combine All Taxonomies ---
-all_tax <- bind_rows(all_tax_list) %>%
-  mutate(Confidence = as.numeric(Confidence))
+all_tax <- bind_rows(all_tax_list)
+if (!"Confidence" %in% names(all_tax)) all_tax$Confidence <- NA_real_
+all_tax <- all_tax %>% mutate(Confidence = suppressWarnings(as.numeric(Confidence)))
+all_tax$Confidence[is.na(all_tax$Confidence)] <- 0
 
 cat(sprintf("\n  Combined taxonomy: %d entries\n", nrow(all_tax)))
 
@@ -1038,6 +1089,7 @@ for (study in names(untrimmed_features)) {
 
   ft_renamed <- ft
   colnames(ft_renamed)[colnames(ft_renamed) != "ASV_ID"] <- new_sample_names
+  ft_renamed$ASV_ID <- paste0(study, "_", ft_renamed$ASV_ID)
   untrimmed_prefixed[[study]] <- ft_renamed
 
   # Track reads
@@ -1065,7 +1117,7 @@ for (col in names(untrimmed_feature_final)) {
 }
 
 # Combine taxonomy from all studies (deduplicate by ASV_ID)
-untrimmed_tax_final <- bind_rows(untrimmed_taxonomy) %>%
+untrimmed_tax_final <- bind_rows(all_tax_list) %>%
   distinct(ASV_ID, .keep_all = TRUE)
 
 untrimmed_total_reads <- sum(untrimmed_feature_final[, -1], na.rm = TRUE)

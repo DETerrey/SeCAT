@@ -1349,7 +1349,8 @@ for (taxa_level in TAXONOMIC_LEVELS) {
 
       # For each MetaASV, count how many studies it appears in (after mapping)
       hash_to_meta <- asv_map %>%
-        mutate(Hash = str_extract(Original_ID, "[0-9a-f]{32}$")) %>%
+        mutate(Hash = ifelse(grepl("[0-9a-f]{32}$", Original_ID),
+                             Original_ID, Original_ID)) %>%
         filter(!is.na(Hash)) %>%
         distinct(Hash, Meta_ID)
 
@@ -1364,6 +1365,15 @@ for (taxa_level in TAXONOMIC_LEVELS) {
         summarise(n_studies = n_distinct(StudyID), .groups = "drop")
 
       shared_rate_before <- mean(study_presence$n_studies >= 2, na.rm = TRUE)
+      .csf <- file.path(dirname(ASV_MAPPING), "cross_study_sharing.csv")
+      if (file.exists(.csf)) {
+        .cs <- readr::read_csv(.csf, show_col_types = FALSE)
+        .v  <- setNames(.cs$value, .cs$metric)
+        if (is.finite(.v[["share_rate_before"]])) {
+          shared_rate_before <- as.numeric(.v[["share_rate_before"]])
+          cat("  Baseline from untrimmed sequence identity (not MetaASV membership)\n")
+        }
+      }
 
       # After: MetaASVs are the direct rownames of otu_after
       otu_a_df <- dataset_after_asv$otu_table %>%
@@ -1379,8 +1389,10 @@ for (taxa_level in TAXONOMIC_LEVELS) {
 
       shared_rate_after <- mean(study_presence_after$n_studies >= 2, na.rm = TRUE)
 
-      share_pass <- shared_rate_after >= shared_rate_before ||
-              abs(shared_rate_after - shared_rate_before) < 0.005
+      share_pass <- isTRUE(shared_rate_after >= shared_rate_before) ||
+              isTRUE(abs(shared_rate_after - shared_rate_before) < 0.005)
+      if (!is.finite(shared_rate_before) || !is.finite(shared_rate_after))
+        cat("  ! Sharing rate undefined (ID mapping empty) - tier reported, not fatal\n")
       cat(sprintf("  MetaASVs shared across ≥2 studies: %.1f%% → %.1f%% %s\n",
                   100 * shared_rate_before, 100 * shared_rate_after,
                   if (share_pass) "[PASS: improved/stable]" else "[NOTE: decreased]"))
@@ -1507,25 +1519,35 @@ tryCatch({
   cat(sprintf("\n--- TIER 3B: Network Stability (%s) ---\n\n", taxa_level))
 
   tryCatch({
-    cat("  Building co-occurrence networks (this may take several minutes)...\n")
+    cat("  Building SPIEC-EASI co-occurrence networks (slow, especially at ASV level)...\n")
 
+    # SPIEC-EASI (neighbourhood selection, 'mb') — compositionally robust network
+    # inference via microeco::trans_network. cor_method=NULL selects a
+    # non-correlation method; COR_p_thres/COR_cut do not apply. StARS resampling
+    # is seeded for reproducibility. Extra spiec.easi/pulsar args pass through '...'.
     net_b <- trans_network$new(
-      dataset     = dataset_before,
-      cor_method  = "spearman",
-      filter_thres = 0.0005,
-      nThreads    = min(4, ncores)
+      dataset      = dataset_before,
+      cor_method   = NULL,
+      filter_thres = 0.0005
     )
-    net_b$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
-    cat("  ✓ BEFORE network built\n")
+    net_b$cal_network(
+      network_method   = "SpiecEasi",
+      SpiecEasi_method = "mb",
+      pulsar.params    = list(rep.num = 50, ncores = 1, seed = 10010)
+    )
+    cat("  ✓ BEFORE network built (SPIEC-EASI)\n")
 
     net_a <- trans_network$new(
-      dataset     = dataset_after,
-      cor_method  = "spearman",
-      filter_thres = 0.0005,
-      nThreads    = min(4, ncores)
+      dataset      = dataset_after,
+      cor_method   = NULL,
+      filter_thres = 0.0005
     )
-    net_a$cal_network(COR_p_thres = 0.01, COR_cut = 0.6)
-    cat("  ✓ AFTER network built\n\n")
+    net_a$cal_network(
+      network_method   = "SpiecEasi",
+      SpiecEasi_method = "mb",
+      pulsar.params    = list(rep.num = 50, ncores = 1, seed = 10010)
+    )
+    cat("  ✓ AFTER network built (SPIEC-EASI)\n\n")
 
     g_b <- net_b$res_network
     g_a <- net_a$res_network
@@ -1555,6 +1577,8 @@ tryCatch({
     hub_thr <- quantile(deg_b, 0.90)
     hubs_b  <- names(deg_b[deg_b >= hub_thr])
     nodes_a <- igraph::V(g_a)$name
+    deg_a   <- igraph::degree(g_a)
+    hubs_a  <- names(deg_a[deg_a >= quantile(deg_a, 0.90)])
 
     if (taxa_level == "ASV" && file.exists(ASV_MAPPING)) {
       hub_map <- read_tsv(ASV_MAPPING, show_col_types = FALSE) %>%
@@ -1568,18 +1592,18 @@ tryCatch({
         cat("  ⚠ Hub nodes: none of the hub hashes found in mapping file\n")
         hub_retained <- NA_real_
       } else {
-        hub_retained <- mean(hubs_b_translated %in% nodes_a, na.rm = TRUE)
+        hub_retained <- mean(hubs_b_translated %in% hubs_a, na.rm = TRUE)
       }
       cat(sprintf("  Hub nodes retained (top 10%% degree, via MetaASV map): %d/%d (%.1f%%) %s\n",
-                  sum(hubs_b_translated %in% nodes_a), n_mappable,
+                  sum(hubs_b_translated %in% hubs_a), n_mappable,
                   100 * ifelse(is.na(hub_retained), 0, hub_retained),
                   if (!is.na(hub_retained) && hub_retained >= 0.80) "[PASS]"
                   else "[NOTE: hub loss > 20%]"))
     } else {
       # Genus / Family: names match directly
-      hub_retained <- mean(hubs_b %in% nodes_a, na.rm = TRUE)
+      hub_retained <- mean(hubs_b %in% hubs_a, na.rm = TRUE)
       cat(sprintf("  Hub nodes retained (top 10%% degree): %d/%d (%.1f%%) %s\n",
-                  sum(hubs_b %in% nodes_a), length(hubs_b),
+                  sum(hubs_b %in% hubs_a), length(hubs_b),
                   100 * hub_retained,
                   if (hub_retained >= 0.80) "[PASS]" else "[NOTE: hub loss > 20%]"))
     }

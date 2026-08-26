@@ -795,6 +795,7 @@ generate_alpha_diversity_summary_one_study <- function(study_data, verdicts_row)
     numeric_cols <- names(otu_table)[sapply(otu_table, is.numeric)]
     if(length(numeric_cols) == 0) return(list(Observed = 0, Shannon = 0))
     vegan_otu_table <- t(otu_table[, numeric_cols, drop = FALSE])
+    vegan_otu_table[is.na(vegan_otu_table)] <- 0
     if (sum(vegan_otu_table) == 0) return(list(Observed = 0, Shannon = 0))
     return(list(Observed = mean(vegan::specnumber(vegan_otu_table)), Shannon = mean(vegan::diversity(vegan_otu_table, index = "shannon"))))
   }
@@ -944,8 +945,9 @@ main <- function() {
   # ===== STEP 2: PROCESS REAL DATA RESULTS =====
   log_and_flush("--- STEP 2: Processing Real Data Results ---")
 
-  distance_cutoff       <- if (exists("DISTANCE_FROM_BASELINE_CUTOFF"))  DISTANCE_FROM_BASELINE_CUTOFF  else 0.15
-  empirical_p_threshold <- if (exists("EMPIRICAL_NULL_P_THRESHOLD"))     EMPIRICAL_NULL_P_THRESHOLD     else 0.05
+  distance_cutoff       <- if (exists("DISTANCE_CUTOFF_THRESHOLD"))      DISTANCE_CUTOFF_THRESHOLD      else 0.15
+  empirical_p_threshold <- if (exists("NULL_MODEL_P_THRESHOLD"))         NULL_MODEL_P_THRESHOLD         else 0.05
+  null_min_consecutive  <- if (exists("NULL_MODEL_MIN_CONSECUTIVE"))     NULL_MODEL_MIN_CONSECUTIVE     else 3L
   penalty_method        <- if (exists("CHANGEPOINT_PENALTY_METHOD"))     toupper(CHANGEPOINT_PENALTY_METHOD) else "SIC"
   penalty_scan          <- if (exists("CHANGEPOINT_BOOTSTRAP_SCAN"))     CHANGEPOINT_BOOTSTRAP_SCAN     else seq(0.4, 2.4, by = 0.1)
   bootstrap_n           <- if (exists("CHANGEPOINT_BOOTSTRAP_N"))        CHANGEPOINT_BOOTSTRAP_N        else 50
@@ -975,6 +977,33 @@ main <- function() {
   } else {
     log_and_flush("  -> No consensus file found. All studies treated as non-outliers.")
   }
+
+
+  # --- Auditable record of studies excluded before assessment -----------------
+  # Studies dropped by the mapping-QC gate never reach the verdict table, so
+  # without this file their exclusion is visible only as an absence. Written
+  # alongside the keep/exclude decisions rather than buried in supporting/.
+  .exc_path    <- file.path(AGGREGATED_DATA_DIR, "excluded_studies.csv")
+  .coords_path <- file.path(OUTDIR, "intermediate/study_alignment_coords.csv")
+  .exc <- tibble::tibble(study_name = character(0), stage_excluded = character(0),
+                         reason = character(0), metric = character(0),
+                         value = numeric(0), mapping_quality = character(0))
+  if (length(outlier_studies) > 0 && file.exists(.coords_path)) {
+    .cd <- suppressMessages(readr::read_csv(.coords_path, show_col_types = FALSE))
+    .cd <- .cd[.cd$study_name %in% outlier_studies, , drop = FALSE]
+    if (nrow(.cd) > 0) {
+      .exc <- tibble::tibble(
+        study_name      = .cd$study_name,
+        stage_excluded  = "mapping_qc (pre-assessment)",
+        reason          = "ASV alignment did not converge on a single window; excluded from the consensus region and from simulation, verdict and trimming stages",
+        metric          = "window_support",
+        value           = .cd$window_support,
+        mapping_quality = .cd$mapping_quality)
+    }
+  }
+  readr::write_csv(.exc, .exc_path)
+  log_and_flush(sprintf("  -> %d study(ies) excluded before assessment; recorded in %s",
+                        nrow(.exc), basename(.exc_path)))
 
   for (real_file in real_data_files) {
     current_study_data <- readRDS(real_file)
@@ -1014,13 +1043,21 @@ main <- function() {
     study_verdicts <- list()
     for (level in get_levels()) {
       level_dissim <- real_curve %>% dplyr::filter(Level == level)
+      # Deterministic per-study/level seed. The CV bootstrap resamples with
+      # sample.int(); unseeded, identical inputs give different changepoints and
+      # therefore different verdicts between runs. Deriving the seed from study
+      # and level keeps replicates independent but fully reproducible.
+      .cp_seed <- (if (exists("CHANGEPOINT_SEED")) CHANGEPOINT_SEED else 10010L) +
+                  sum(utf8ToInt(paste0(study_name, "|", level)))
+      set.seed(.cp_seed)
       cp_info    <- select_changepoint_penalty_cv(y = level_dissim$Dissimilarity, trim_bp = level_dissim$Trim_BP,
                                                   penalty_method = penalty_method, scan = penalty_scan,
                                                   nboot = bootstrap_n, min_trim_bp = 10)
       res_cutoff <- find_degradation_point(real_curve, sim_data_for_task, sim_baseline_for_task,
                                            level, task_id_for_sims, distance_cutoff, min_trim_bp = 10)
       res_null   <- find_null_model_point(real_curve, sim_data_for_task,
-                                          level, task_id_for_sims, empirical_p_threshold, min_trim_bp = 10)
+                                          level, task_id_for_sims, empirical_p_threshold,
+                                          min_consecutive_steps = null_min_consecutive, min_trim_bp = 10)
       res_bc     <- find_bc_ceiling_point(real_curve, level, target_trim,
                                           bc_ceiling = bc_ceiling, min_trim_bp = 10)
       res_ret    <- find_retention_floor_point(current_study_data$retention_data, level, target_trim,

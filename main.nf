@@ -132,7 +132,8 @@ workflow {
     PREPARE_SIMS(
         collected_coords,
         params.reference_db,
-        clean_manifest
+        clean_manifest,
+        STUDY_MAPPING.out.aligned_fasta.map { it[1] }.collect()
     )
 
     indexed_studies_with_aln_ch = indexed_studies_ch
@@ -140,8 +141,27 @@ workflow {
         .join(STUDY_MAPPING.out.aligned_fasta, failOnMismatch: true, failOnDuplicate: true)
         .map { study_name, task_id, row, aln -> tuple(task_id, study_name, row, aln) }  // restore original order + add aln
 
+    // Mapping-QC gate: drop studies whose ASVs did not converge on a single window
+    // (mapping_quality == UNSTABLE) BEFORE the real-data degradation analysis, so
+    // they never receive a verdict or a per-study report. They are already removed
+    // from the consensus (PREPARE_SIMS) and the simulation task matrix; here we keep
+    // the real-analysis channel consistent. Gated by exclude_unstable_from_consensus.
+    unstable_studies_ch = collected_coords
+        .splitCsv(header: true)
+        .filter { it.mapping_quality == 'UNSTABLE' }
+        .map { it.study_name }
+        .collect()
+        .ifEmpty { [] }
+
+    analysable_studies_with_aln_ch = indexed_studies_with_aln_ch
+        .combine(unstable_studies_ch)
+        .filter { task_id, study_name, row, aln, unstable ->
+            !(params.exclude_unstable_from_consensus && (study_name in unstable))
+        }
+        .map { task_id, study_name, row, aln, unstable -> tuple(task_id, study_name, row, aln) }
+
     ANALYSE_REAL(
-        indexed_studies_with_aln_ch,
+        analysable_studies_with_aln_ch,
         collected_coords,
         PREPARE_SIMS.out.consensus_info.first(),
         clean_manifest
@@ -156,7 +176,8 @@ workflow {
         sim_tasks_ch,
         PREPARE_SIMS.out.sim_reference_subset.first(),
         collected_coords,
-        PREPARE_SIMS.out.consensus_info
+        PREPARE_SIMS.out.consensus_info,
+        PREPARE_SIMS.out.null_structure.first()
     )
 
     all_real_results_ch = ANALYSE_REAL.out.results_rds.collect()
@@ -203,7 +224,11 @@ workflow {
                 MERGE_DATASETS.out.pre_tax,
                 MERGE_DATASETS.out.pre_meta.ifEmpty(file('NO_META')),
                 MERGE_DATASETS.out.asv_mapping.ifEmpty(file('NO_MAPPING')),
-                AGGREGATE.out.aggregated_dir
+                AGGREGATE.out.aggregated_dir,
+                clean_manifest,
+                Channel.value(file('NO_ROSTER')),
+                PREPARE_SIMS.out.consensus_info.first(),
+                TRIM_SEQUENCES.out.trim_summary
             )
         }
     } else {
@@ -256,7 +281,11 @@ workflow STANDARDIZE {
             MERGE_DATASETS.out.pre_tax,
             MERGE_DATASETS.out.pre_meta.ifEmpty(file('NO_META')),
             MERGE_DATASETS.out.asv_mapping.ifEmpty(file('NO_MAPPING')),
-            aggregated_dir
+            aggregated_dir,
+            file("${params.outdir}/cleaned_data/secat_manifest_clean.tsv", checkIfExists: true),
+            selected_file,
+            consensus_info,
+            TRIM_SEQUENCES.out.trim_summary
         )
     }
 }

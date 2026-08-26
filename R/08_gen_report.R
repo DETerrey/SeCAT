@@ -741,7 +741,7 @@ plot_taxon_impact_combined <- function(study_data,
       scale_fill_manual(values = c("FALSE" = "darkred", "TRUE" = "darkgreen"), labels = c("Decrease", "Increase"), name = "Direction") +
       coord_flip() +
       labs(title = paste("Top 5 Increased + Top 5 Decreased", taxonomic_level, "s"),
-           subtitle = paste("Change from 0 to", safe_threshold_bp, "bp"),
+           subtitle = paste("Change from 0 to", safe_threshold_bp, "alignment columns"),
            x = taxonomic_level, y = "Change in Relative Abundance") +
       theme_bw() + theme(legend.position = "bottom")
   } else {
@@ -1616,7 +1616,7 @@ create_method_performance_plot <- function() {
 # Params:   study_name, primer — used to construct expected filename.
 # Returns:  logical.
 check_report_exists <- function(study_name, primer) {
-  file.exists(file.path(PER_STUDY_DIR, paste0("Report_Fixed_", study_name, "_", primer, ".pdf")))
+  file.exists(file.path(PER_STUDY_DIR, paste0("Report_", study_name, "_", primer, ".pdf")))
 }
 
 message("--- Processing studies with file existence checks ---")
@@ -1878,7 +1878,7 @@ if (!SKIP_INDIVIDUAL) {
                       "None"
                     }
                   } else {
-                    paste(observed_thresh_bp, "bp")
+                    paste(observed_thresh_bp, "alignment columns")
                   }
 
                   # Append pre-trim flag if set
@@ -1905,7 +1905,7 @@ if (!SKIP_INDIVIDUAL) {
                         plot_annotation(
                             title = paste("MESAP Analysis Report:", study_name),
                             subtitle = subtitle_txt,
-                            caption = paste("Generated:", Sys.Date(), "| Primer:", primer, "| Valid data to", obs_max_step_bp, "bp"),
+                            caption = paste("Generated:", Sys.Date(), "| Primer:", primer, "| Valid data to", obs_max_step_bp, "alignment columns"),
                             theme = theme(plot.title = element_text(size = 18, face = "bold"))
                         )
 
@@ -1926,7 +1926,7 @@ if (!SKIP_INDIVIDUAL) {
             if (length(png_files_for_pdf) > 0) {
                 message(paste("  → Creating PDF with", length(png_files_for_pdf), "pages..."))
                 tryCatch({
-                    pdf_filename <- file.path(PER_STUDY_DIR, paste0("Report_Fixed_", study_name, "_", primer, ".pdf"))
+                    pdf_filename <- file.path(PER_STUDY_DIR, paste0("Report_", study_name, "_", primer, ".pdf"))
                     pdf(pdf_filename, width = PLOT_WIDTH, height = PLOT_HEIGHT, onefile = TRUE)
                     for (png_file in png_files_for_pdf) {
                         img <- png::readPNG(png_file)

@@ -30,6 +30,10 @@ process ANALYSE_REAL {
     export SECAT_MIN_MEDIAN_READ_DEPTH="${params.min_median_read_depth}"
     export SECAT_CHANGEPOINT_METHOD="${params.changepoint_penalty_method}"
     export SECAT_CHANGEPOINT_MULTIPLIER="${params.changepoint_penalty_multiplier}"
+    export SECAT_CHANGEPOINT_SCAN_MIN="${params.changepoint_scan_min}"
+    export SECAT_CHANGEPOINT_SCAN_MAX="${params.changepoint_scan_max}"
+    export SECAT_CHANGEPOINT_SCAN_BY="${params.changepoint_scan_by}"
+    export SECAT_CHANGEPOINT_BOOTSTRAP_N="${params.changepoint_bootstrap_n}"
     export SECAT_NULL_MODEL_P="${params.null_model_p_threshold}"
     export SECAT_NULL_MODEL_MIN_CONSEC="${params.null_model_min_consecutive}"
     export SECAT_NULL_MODEL_MIN_TRIM_BP="${params.null_model_min_trim_bp}"
@@ -41,6 +45,8 @@ process ANALYSE_REAL {
     cp ${consensus_info} output/intermediate/consensusregioninfo.csv    2>/dev/null || true
     cp ${aligned_fasta}  output/intermediate/aligned_fastas/${study_name}_aligned.fasta
     export SECAT_PROJECTDIR="${projectDir}"
+    export SECAT_EXCLUDE_UNSTABLE="${params.exclude_unstable_from_consensus}"
+    # cache-bust: taxonomy column detection
     Rscript ${projectDir}/R/06_analyse_real.R "${study_name}"
     mv output/real_data_results/${study_name}/${study_name}_results.rds ./${study_name}_results.rds
     """

@@ -28,7 +28,7 @@
 # taxonomy path, and metadata path.
 # Valid values: absolute path to a correctly formatted SeCAT manifest.
 # Data impact: defines the entire study set entering the pipeline.
-manifest:     "/home/users/dterrey/SeCAT_AlessiaTest/Data_David/secat_manifest.tsv"
+manifest: "/home/users/dterrey/SeCAT_AlessiaTest/Data_David/secat_manifest_paper.tsv"
 
 # Path to the SILVA reference alignment (full-length, aligned, truncated FASTA).
 # Must be the NR99 (non-redundant 99%) version for consistent coordinate mapping.
@@ -51,7 +51,7 @@ bind_paths: "/home/users/dterrey/SeCAT_AlessiaTest/Data_David,/home/users/dterre
 
 # Root output directory. All results, intermediate files, and reports are
 # written to subdirectories beneath this path.
-outdir: "/work/scratch-nopw2/dterrey/secat_output"
+outdir: "/work/scratch-nopw2/dterrey/secat_paper"
 
 # ==============================================================================
 # ANALYSIS MODE
@@ -446,7 +446,7 @@ selection_mode: "roster"
 
 # Path to the roster/selection file (only used when selection_mode = "roster"
 # ). One study ID per line.
-selection_file: "/home/users/dterrey/SeCAT_AlessiaTest/SeCAT/selection_roster.txt"
+selection_file: "/home/users/dterrey/SeCAT_AlessiaTest/SeCAT/selection_roster_paper.txt"
 
 # ==============================================================================
 # REPORTS AND OUTPUT CONTROL

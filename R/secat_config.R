@@ -205,6 +205,23 @@ CORE_PREVALENCE_THRESHOLD     <- 0.90
 #   Default calibrated via testing for optimal Type I error control.
 CHANGEPOINT_PENALTY_METHOD    <- .secat_env("SECAT_CHANGEPOINT_METHOD",      "MANUAL")
 
+# --- Null-model community construction -------------------------------------
+# FALSE (default) = legacy uniform random draw from the reference DB. That null
+# has almost no close relatives, so trimming cannot merge taxa and the null-model
+# p-value is not a meaningful test. TRUE = build the null from independent
+# reference sequences but match the study's amplicon window, family-size
+# structure and within-family divergence.
+SIM_STRUCTURE_MATCHED_NULL    <- .secat_env("SECAT_SIM_MATCHED_NULL",  FALSE, "logical")
+SIM_CLUSTER_IDENTITY          <- .secat_env("SECAT_SIM_CLUSTER_ID",    0.97,  "numeric")
+# Template size for structure measurement. Subsampling biases the estimate DOWN
+# (PRJEB50983: 0.25 at n=100, 0.37 at n=300, 0.66 at n=900), so keep this high.
+SIM_MAX_TEMPLATE              <- .secat_env("SECAT_SIM_MAX_TEMPLATE", 1500,  "integer")
+# Community size; if unset the matched null uses the study's own ASV count.
+SIMULATION_COMMUNITY_SIZE     <- .secat_env("SECAT_SIM_COMMUNITY_SIZE", 100,  "integer")
+
+# LEGACY / NOT USED BY THE VERDICT PATH.
+# Consumed only by calculate_changepoint_thresholds() in secat_utils.R. The
+# published verdicts use the bootstrap CV scan below, which ignores this value.
 # Multiplier applied to the MANUAL penalty (penalty = multiplier * var(data)).
 # Valid values: positive numeric (0.1-100; 1 = baseline).
 # Data impact: increasing makes PELT less sensitive (fewer changepoints,
@@ -212,6 +229,22 @@ CHANGEPOINT_PENALTY_METHOD    <- .secat_env("SECAT_CHANGEPOINT_METHOD",      "MA
 #   sensitive (flags smaller shifts, higher false positive rate).
 #   Default calibrated via testing for optimal Type I error control.
 CHANGEPOINT_PENALTY_MULTIPLIER <- .secat_env("SECAT_CHANGEPOINT_MULTIPLIER", 1,   "numeric")
+
+# --- Changepoint bootstrap CV scan (THIS is what drives the verdicts) -------
+# Verdict thresholds come from select_changepoint_penalty_cv() in 07_aggregate.R,
+# which does NOT use CHANGEPOINT_PENALTY_MULTIPLIER. Instead it scans a range of
+# penalty multipliers and picks, per study and per taxonomic level, the value
+# whose bootstrap changepoint location is most stable. These parameters control
+# that scan. Penalty at multiplier m = m * log(n).
+# Base seed for the changepoint bootstrap CV, combined with study name and level
+# so each study/level is independent yet reproducible across runs.
+CHANGEPOINT_SEED              <- .secat_env("SECAT_CHANGEPOINT_SEED",  10010, "integer")
+CHANGEPOINT_SCAN_MIN          <- .secat_env("SECAT_CHANGEPOINT_SCAN_MIN",  0.4, "numeric")
+CHANGEPOINT_SCAN_MAX          <- .secat_env("SECAT_CHANGEPOINT_SCAN_MAX",  2.4, "numeric")
+CHANGEPOINT_SCAN_BY           <- .secat_env("SECAT_CHANGEPOINT_SCAN_BY",   0.1, "numeric")
+CHANGEPOINT_BOOTSTRAP_N       <- .secat_env("SECAT_CHANGEPOINT_BOOTSTRAP_N", 50, "integer")
+CHANGEPOINT_BOOTSTRAP_SCAN    <- seq(CHANGEPOINT_SCAN_MIN, CHANGEPOINT_SCAN_MAX,
+                                     by = CHANGEPOINT_SCAN_BY)
 
 # ==============================================================================
 # SECTION 8: NULL MODEL COMPARISON
@@ -274,6 +307,12 @@ RETENTION_FLOOR_THRESHOLD     <- .secat_env("SECAT_RETENTION_FLOOR",      0.70, 
 # only when >= 2 detection methods agree within this distance of each other; a
 # lone trigger is WARNING_SINGLE. Valid values: 50-2000.
 VERDICT_CONSENSUS_TOLERANCE_BP <- .secat_env("SECAT_VERDICT_TOLERANCE_BP", 500, "numeric")
+
+# --- Mapping quality-control (convergence check) ---
+MAPPING_SUPPORT_BAND            <- .secat_env("SECAT_MAPPING_SUPPORT_BAND", 250,  "numeric")
+MAPPING_SUPPORT_WARN            <- .secat_env("SECAT_MAPPING_SUPPORT_WARN", 0.70, "numeric")
+MAPPING_SUPPORT_FAIL            <- .secat_env("SECAT_MAPPING_SUPPORT_FAIL", 0.40, "numeric")
+EXCLUDE_UNSTABLE_FROM_CONSENSUS <- .secat_env("SECAT_EXCLUDE_UNSTABLE",     TRUE, "logical")
 
 # ==============================================================================
 # SECTION 10: OUTPUT AND REGENERATION CONTROL

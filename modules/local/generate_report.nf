@@ -37,6 +37,7 @@ process GENERATE_REPORT {
     export SECAT_FORCE_REGENERATE="${params.force_regenerate}"
     export SECAT_OUTDIR="./output"
     export SECAT_PROJECTDIR="${projectDir}"
+    # cache-bust: report filename
     Rscript ${projectDir}/R/08_gen_report.R
 
     # stage the reports/ tree at the work-dir root so publishDir can pick it up

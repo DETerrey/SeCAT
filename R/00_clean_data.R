@@ -77,6 +77,14 @@ MIN_SAMPLES          <- 3
 # Samples with fewer total reads than this are dropped (removes empties)
 MIN_READS_PER_SAMPLE <- 1
 
+# --- Depth / abundance QC (Paula Huber, Aug 2026) --------------------------
+# Low-depth samples and low-abundance ASVs bias diversity estimates, so both are
+# removed before analysis. Applied in this order: samples first, then ASVs
+# recomputed over the surviving samples. 0 disables a filter.
+MIN_SAMPLE_DEPTH    <- as.numeric(Sys.getenv("SECAT_MIN_SAMPLE_DEPTH",   unset = "0"))
+MIN_ASV_PREVALENCE  <- as.numeric(Sys.getenv("SECAT_MIN_ASV_PREVALENCE", unset = "0"))
+MIN_ASV_READS       <- as.numeric(Sys.getenv("SECAT_MIN_ASV_READS",      unset = "0"))
+
 message("========================================================")
 message("          SeCAT DATA CLEANING UTILITY v2.2")
 message("        (Robust numeric loading + diagnostics)")
@@ -86,6 +94,9 @@ message(paste("Output manifest:", MANIFEST_OUT))
 message(paste("Drop taxa matching:", TAXA_TO_REMOVE))
 message(paste("Min samples per study:", MIN_SAMPLES))
 message(paste("Min reads per sample:", MIN_READS_PER_SAMPLE))
+message(paste("Min sample depth   :", MIN_SAMPLE_DEPTH, "(0 = off)"))
+message(paste("Min ASV prevalence :", MIN_ASV_PREVALENCE, "(0 = off)"))
+message(paste("Min ASV total reads:", MIN_ASV_READS, "(0 = off)"))
 message("========================================================")
 
 if (!file.exists(MANIFEST_IN)) stop("FATAL: Manifest not found: ", MANIFEST_IN)
@@ -619,6 +630,28 @@ for (p in unique(c(dirname(clean_counts), dirname(clean_taxonomy),
   valid_samples <- mapping_result$valid_samples
   meta_clean    <- mapping_result$meta_clean
 
+  # Separator-agnostic reconciliation. R's make.names() rewrites "-" and " "
+  # as "." in column names, so a metadata sample_id of "E30-1_S109" never
+  # matches a feature-table column "E30.1_S109" under exact comparison.
+  .canon <- function(x) gsub("[-. ]", "_", as.character(x))
+  .ft_canon  <- .canon(ft_sample_cols)
+  .val_canon <- .canon(valid_samples)
+  if (sum(ft_sample_cols %in% valid_samples) == 0 &&
+      sum(.ft_canon %in% .val_canon) > 0) {
+    .hit <- sum(.ft_canon %in% .val_canon)
+    message(sprintf("     -> Sample IDs differ only by separators; matched %d after normalisation.", .hit))
+    # Rewrite metadata IDs to the feature table's spelling so every later
+    # join (metadata, valid_samples, column subsetting) agrees.
+    .map <- setNames(ft_sample_cols, .ft_canon)
+    .fix <- .map[.val_canon]
+    valid_samples <- ifelse(is.na(.fix), valid_samples, unname(.fix))
+    if (!is.null(sample_id_col) && sample_id_col %in% names(meta_clean)) {
+      .mc <- .map[.canon(meta_clean[[sample_id_col]])]
+      meta_clean[[sample_id_col]] <- ifelse(is.na(.mc),
+                                            meta_clean[[sample_id_col]], unname(.mc))
+    }
+  }
+
   n_matched <- sum(ft_sample_cols %in% valid_samples)
   match_pct <- 100 * n_matched / length(valid_samples)
 
@@ -641,9 +674,37 @@ for (p in unique(c(dirname(clean_counts), dirname(clean_taxonomy),
     select(all_of(cols_to_keep)) %>%
     filter(.data[["ASV_ID"]] %in% valid_asvs)
 
+  # STEP 1: drop low-depth samples. Must precede ASV filtering, because
+  # prevalence and totals are defined over the samples that remain.
+  if (MIN_SAMPLE_DEPTH > 0 && ncol(ft_clean) > 1) {
+    .st  <- colSums(ft_clean[, -1, drop = FALSE], na.rm = TRUE)
+    .low <- names(.st)[.st < MIN_SAMPLE_DEPTH]
+    if (length(.low) > 0) {
+      message(sprintf("     -> Dropping %d/%d samples below %d reads (%.1f%%)",
+                      length(.low), length(.st), MIN_SAMPLE_DEPTH,
+                      100 * length(.low) / length(.st)))
+      ft_clean <- ft_clean %>%
+        select(all_of(c("ASV_ID", setdiff(names(ft_clean)[-1], .low))))
+    }
+    if (ncol(ft_clean) <= 1) {
+      message("     [X] No samples survived the depth filter. Skipping.")
+      manifest_clean[i, c("asv_counts_path","taxonomy_path","metadata_path","asv_fasta_path")] <- NA_character_
+      next
+    }
+  }
+
   # Remove ASVs with zero reads across retained samples
   # (these had all their reads in samples that were filtered out)
-  asv_totals <- rowSums(ft_clean[, -1], na.rm = TRUE)
+  # STEP 2: ASV prevalence + abundance, computed over the surviving samples.
+  asv_totals <- rowSums(ft_clean[, -1, drop = FALSE], na.rm = TRUE)
+  if (MIN_ASV_PREVALENCE > 0 || MIN_ASV_READS > 0) {
+    .prev <- rowSums(ft_clean[, -1, drop = FALSE] > 0, na.rm = TRUE)
+    .keep <- (.prev >= MIN_ASV_PREVALENCE) & (asv_totals >= MIN_ASV_READS)
+    message(sprintf("     -> ASV filter (prevalence >= %d, reads >= %d): %d of %d retained",
+                    MIN_ASV_PREVALENCE, MIN_ASV_READS, sum(.keep), nrow(ft_clean)))
+    ft_clean   <- ft_clean[.keep, ]
+    asv_totals <- asv_totals[.keep]
+  }
   ft_clean   <- ft_clean[asv_totals > 0, ]
   message(sprintf("     → After ASV zero-filter: %d ASVs retained", nrow(ft_clean)))
 
@@ -730,6 +791,17 @@ message("========================================================")
 # Remove studies that failed cleaning (NA paths)
 manifest_clean_final <- manifest_clean %>%
   filter(!is.na(asv_counts_path) & !is.na(asv_fasta_path))
+
+# Studies blanked by any check above are removed here. Announce them: a study
+# vanishing between the manifest and the run is otherwise completely silent.
+.dropped <- setdiff(manifest$study_name, manifest_clean$study_name)
+if (length(.dropped) > 0) {
+  message(sprintf("\n**** %d STUDY(IES) DROPPED BY CLEAN_DATA: %s",
+                  length(.dropped), paste(.dropped, collapse = ", ")))
+  message("**** See the per-study messages above for the reason.\n")
+} else {
+  message(sprintf("\n  All %d studies passed cleaning.\n", nrow(manifest_clean)))
+}
 
 validation_issues <- 0
 

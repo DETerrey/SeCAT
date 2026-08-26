@@ -285,7 +285,7 @@ find_degradation_point <- function(real_curve, sim_dissim_data, sim_dissim_basel
 #   Requires: Biostrings (>= 2.60.0).
 # ------------------------------------------------------------------------------
 
-get_community <- function(db_seq, ntaxas = 100, seed = NULL) {
+get_community <- function(db_seq, ntaxas = 100, seed = NULL, community_seqs = NULL) {
 
   if (!is.null(seed)) set.seed(seed)
 
@@ -300,11 +300,15 @@ get_community <- function(db_seq, ntaxas = 100, seed = NULL) {
     stop(paste("Insufficient sequences in reference database:", n_available))
   }
 
-  message(sprintf("  -> Sampling %d taxa from %d reference sequences", ntaxas, n_available))
-
-  # Random unbiased sample
-  sampled_indices <- sample(seq_along(db_seq), ntaxas, replace = FALSE)
-  community_seqs <- db_seq[sampled_indices]
+  if (!is.null(community_seqs)) {
+    # Pre-built community (e.g. structure-matched null): skip random sampling.
+    ntaxas <- length(community_seqs)
+    message(sprintf("  -> Using supplied community of %d taxa (structure-matched)", ntaxas))
+  } else {
+    message(sprintf("  -> Sampling %d taxa from %d reference sequences", ntaxas, n_available))
+    sampled_indices <- sample(seq_along(db_seq), ntaxas, replace = FALSE)
+    community_seqs <- db_seq[sampled_indices]
+  }
 
   # EXTRACT TAXONOMY FROM SILVA HEADERS
   # SILVA format: ">Accession.start.end Taxonomy_string"
@@ -697,6 +701,19 @@ get_otu_tab_from_uc <- function(otu_table, uc_file) {
     dplyr::group_by(target_clean) %>%
     dplyr::summarise(Group = stringr::str_c(query_clean, collapse = ""), .groups = 'drop')
 
+  # Map each centroid to a REPRESENTATIVE study ASV drawn from its own cluster.
+  # A trimmed sequence can re-cluster onto a reference centroid that is not itself
+  # one of this study's ASVs; joining such a centroid against otu_lookup yields NA,
+  # which silently renames the row and destroys taxon identity across trim steps
+  # (retention then reports 0% even though the counts are intact).
+  centroid_rep <- uc_cleaned %>%
+    dplyr::group_by(target_clean) %>%
+    dplyr::summarise(rep_clean = dplyr::first(query_clean), .groups = 'drop') %>%
+    dplyr::left_join(
+      dplyr::select(otu_lookup, OTU_clean, rep_OTU = OTU, rep_taxonomy = taxonomy),
+      by = c("rep_clean" = "OTU_clean")
+    )
+
   # Get sample column names BEFORE adding temporary columns.
   # This is robust to non-standard column names in the OTU table.
   sample_cols <- names(otu_table)[sapply(otu_table, is.numeric)]
@@ -718,7 +735,13 @@ get_otu_tab_from_uc <- function(otu_table, uc_file) {
   otutable_n <- otutable_n %>%
     dplyr::left_join(otu_lookup, by = c("target_clean" = "OTU_clean")) %>%
     dplyr::left_join(uc_concat, by = "target_clean") %>%
-    dplyr::select(-target_clean)  # Remove temporary column.
+    dplyr::left_join(centroid_rep, by = "target_clean") %>%
+    # Preserve taxon identity: own name -> representative member ASV -> centroid ID.
+    dplyr::mutate(
+      OTU      = dplyr::coalesce(as.character(OTU), as.character(rep_OTU), target_clean),
+      taxonomy = dplyr::coalesce(as.character(taxonomy), as.character(rep_taxonomy))
+    ) %>%
+    dplyr::select(-target_clean, -rep_clean, -rep_OTU, -rep_taxonomy)
 
   # Diagnostic reporting.
   if (nrow(otutable_n) == 0) {
@@ -774,7 +797,15 @@ sync_data_for_study <- function(job_info) {
   if (!file.exists(asv_counts_path)) stop("FATAL: ASV Counts file not found at: ", asv_counts_path)
 
   message("  -> Loading feature table and FASTA file...")
-  real_counts_raw <- readr::read_tsv(asv_counts_path, show_col_types = FALSE, skip = 1)
+  # Detect whether line 1 is a bare comment (QIIME2/BIOM) or the header itself.
+  # Blindly skipping line 1 consumes a real header, promotes the first ASV's counts
+  # to column names, drops that ASV, and creates duplicate "0" columns whose
+  # positional name-repair suffixes shift between trim steps -> NA cells -> 0% retention.
+  .first_line <- readLines(asv_counts_path, n = 1L, warn = FALSE)
+  .skip_n <- if (length(.first_line) == 1L &&
+                 startsWith(.first_line, "#") &&
+                 !grepl("\t", .first_line)) 1L else 0L
+  real_counts_raw <- readr::read_tsv(asv_counts_path, show_col_types = FALSE, skip = .skip_n)
   real_sequences_raw <- Biostrings::readDNAStringSet(asv_fasta_path)
   message("  -> Synchronizing IDs between feature table and FASTA...")
 
@@ -811,9 +842,28 @@ sync_data_for_study <- function(job_info) {
     }, error = function(e) { NULL })
 
     if (!is.null(taxonomy_data)) {
-        # Auto-detect standard ID and taxonomy column names.
+        # Auto-detect the ID column; fall back to the first column, which
+        # load_table_robust()/read_tsv already place as the feature ID.
         id_col <- intersect(c("Feature ID", "ASV_ID", "#OTU ID", "OTU"), names(taxonomy_data))[1]
+        if (is.na(id_col)) id_col <- names(taxonomy_data)[1]
+
+        # Detect the lineage column by NAME first, then by CONTENT. Matching on
+        # name alone silently dropped taxonomy for any file using a non-standard
+        # header (e.g. "Assignation"), collapsing every rank to ASV IDs.
         tax_col <- intersect(c("Taxon", "Taxonomy", "Classification", "Lineage"), names(taxonomy_data))[1]
+        if (is.na(tax_col)) {
+            .cand <- setdiff(names(taxonomy_data), id_col)
+            .looks <- vapply(.cand, function(cc) {
+                v <- as.character(taxonomy_data[[cc]])
+                v <- v[!is.na(v) & nzchar(v)]
+                if (!length(v)) return(FALSE)
+                mean(grepl(";|[dkpcofgs]__", v)) > 0.5
+            }, logical(1))
+            if (any(.looks)) {
+                tax_col <- .cand[which(.looks)[1]]
+                message(sprintf("  -> Taxonomy column detected by content: '%s'", tax_col))
+            }
+        }
 
         if (!is.na(id_col) && !is.na(tax_col)) {
             otu_table_real <- real_counts_synced %>%
@@ -822,6 +872,15 @@ sync_data_for_study <- function(job_info) {
                   taxonomy_data %>% dplyr::select(!!rlang::sym(id_col), !!rlang::sym(tax_col)) %>% dplyr::rename(OTU = !!rlang::sym(id_col), taxonomy = !!rlang::sym(tax_col)),
                   by = "OTU"
                 )
+            .n_tax <- sum(!is.na(otu_table_real$taxonomy) & grepl(";", otu_table_real$taxonomy))
+            if (.n_tax == 0) {
+                message("  -> [WARN] taxonomy file loaded but 0 features matched by ID.")
+                message("     Rank-level results will fall back to ASV IDs.")
+            } else {
+                message(sprintf("  -> Taxonomy joined for %d / %d features.", .n_tax, nrow(otu_table_real)))
+            }
+        } else {
+            message("  -> [WARN] taxonomy file present but no lineage column recognised.")
         }
     }
   }
@@ -1414,7 +1473,8 @@ calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, incre
   all_retention <- list()
   
   for (level in get_levels()) {
-    retention_values <- numeric(num_steps)
+    # NA = not measured; 0 = measured and genuinely empty.
+    retention_values <- rep(NA_real_, num_steps)
     
     # Get the initial (untrimmed) reference table
     initial_table <- otu_tables_per_level[["0"]][[level]]
@@ -1426,7 +1486,7 @@ calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, incre
       sample_cols <- names(initial_table)[sapply(initial_table, is.numeric)]
       
       if(length(sample_cols) > 0) {
-        nonzero_mask <- rowSums(initial_table[, sample_cols, drop = FALSE]) > 0
+        nonzero_mask <- rowSums(initial_table[, sample_cols, drop = FALSE], na.rm = TRUE) > 0
         initial_taxa <- initial_table[[level]][nonzero_mask]
         initial_taxa <- initial_taxa[!is.na(initial_taxa) & initial_taxa != ""]
         n_initial <- length(initial_taxa)
@@ -1435,13 +1495,18 @@ calculate_taxonomic_retention <- function(otu_tables_per_level, num_steps, incre
           trim_key <- as.character(step * increment)
           trimmed_table <- otu_tables_per_level[[trim_key]][[level]]
           
-          if (is.null(trimmed_table) || nrow(trimmed_table) == 0) {
+          if (is.null(trimmed_table)) {
+            # No table for this step = NO DATA, not total loss. Recording 0 here
+            # plots as a vertical collapse and can trigger a spurious
+            # retention-floor HARD_FAIL.
+            retention_values[step] <- NA_real_
+          } else if (nrow(trimmed_table) == 0) {
             retention_values[step] <- 0
           } else {
             # Filter to taxa with nonzero abundance in any sample
             t_sample_cols <- names(trimmed_table)[sapply(trimmed_table, is.numeric)]
             if(length(t_sample_cols) > 0) {
-              t_nonzero_mask <- rowSums(trimmed_table[, t_sample_cols, drop = FALSE]) > 0
+              t_nonzero_mask <- rowSums(trimmed_table[, t_sample_cols, drop = FALSE], na.rm = TRUE) > 0
               retained_taxa <- trimmed_table[[level]][t_nonzero_mask]
               retained_taxa <- retained_taxa[!is.na(retained_taxa) & retained_taxa != ""]
               
@@ -2109,3 +2174,197 @@ run_trim_analysis <- function(sequences, vsearch_path, output_dir, num_steps = 3
 }
 
 # =====================================================================
+
+
+# ------------------------------------------------------------------------------
+# Function: measure_community_structure
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Measure the sequence-similarity structure of one study's aligned ASVs. This
+#   is the expensive step (pairwise distances, O(n^2)) and is run ONCE per study
+#   in PREPARE_SIMS; simulation replicates consume the cached result.
+#
+#   Subsampling biases this estimate downward -- measured on PRJEB50983, the
+#   fraction of taxa with a >=97% neighbour reads 0.25 at n=100, 0.37 at n=300
+#   and 0.66 at n=900 -- so max_template should be as large as runtime allows.
+#
+# Returns: [list] win_start, win_end, var_profile, nn_identity, close_ids,
+#                 fam_sizes, n_template, n_total
+# ------------------------------------------------------------------------------
+measure_community_structure <- function(template_aln, cluster_id = 0.97,
+                                        max_template = 1500L) {
+  if (is.null(template_aln) || length(template_aln) < 2)
+    stop("measure_community_structure: template alignment missing or too small.")
+  n_total <- length(template_aln)
+  tpl <- template_aln
+  if (length(tpl) > max_template) tpl <- tpl[sample(seq_along(tpl), max_template)]
+  if (length(tpl) < 50)
+    message(sprintf("  -> [WARN] only %d template sequences; structure estimates will be noisy.",
+                    length(tpl)))
+
+  cm       <- Biostrings::consensusMatrix(tpl, as.prob = FALSE)
+  bases    <- intersect(rownames(cm), c("A", "C", "G", "T"))
+  occupied <- which(colSums(cm[bases, , drop = FALSE]) > 0)
+  if (length(occupied) < 50)
+    stop("measure_community_structure: template occupies too few columns.")
+
+  sub_cm <- cm[bases, occupied, drop = FALSE]
+  col_n  <- colSums(sub_cm)
+  ent <- vapply(seq_len(ncol(sub_cm)), function(j) {
+    if (col_n[j] < 2) return(0)
+    p <- sub_cm[, j] / col_n[j]; p <- p[p > 0]
+    -sum(p * log(p))
+  }, numeric(1))
+  if (sum(ent) <= 0) ent <- rep(1, length(ent))
+
+  dmat <- as.matrix(DECIPHER::DistanceMatrix(tpl, verbose = FALSE,
+                                             includeTerminalGaps = TRUE))
+  idm <- 1 - dmat; diag(idm) <- NA_real_
+  nn_identity <- apply(idm, 1, max, na.rm = TRUE)
+  nn_identity <- nn_identity[is.finite(nn_identity)]
+  close_ids   <- nn_identity[nn_identity >= cluster_id]
+  if (length(close_ids) == 0) close_ids <- cluster_id
+
+  adj <- idm >= cluster_id; adj[is.na(adj)] <- FALSE
+  n_t <- nrow(adj); comp <- integer(n_t); cid <- 0L
+  for (i in seq_len(n_t)) {
+    if (comp[i] != 0L) next
+    cid <- cid + 1L; stack <- i
+    while (length(stack)) {
+      v <- stack[1]; stack <- stack[-1]
+      if (comp[v] != 0L) next
+      comp[v] <- cid
+      stack <- c(stack, which(adj[v, ] & comp == 0L))
+    }
+  }
+  fam_sizes <- as.integer(table(comp))
+  message(sprintf("  -> Structure: %d/%d taxa measured, %d families (mean %.2f), %.0f%% with a >=%.0f%% neighbour",
+                  length(tpl), n_total, length(fam_sizes), mean(fam_sizes),
+                  100 * mean(nn_identity >= cluster_id), 100 * cluster_id))
+  list(win_start = min(occupied), win_end = max(occupied),
+       occupied = occupied, var_profile = ent / sum(ent),
+       nn_identity = nn_identity, close_ids = close_ids,
+       fam_sizes = fam_sizes, n_template = length(tpl), n_total = n_total)
+}
+
+# ------------------------------------------------------------------------------
+# Function: build_structure_matched_community
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Build a NULL community from INDEPENDENT reference sequences that reproduces a
+#   study's amplicon window, family-size distribution and within-family divergence
+#   (from measure_community_structure). Cheap: no pairwise distances.
+#
+#   The default null (uniform random reference draw) is phylogenetically dispersed
+#   -- measured on PRJEB22038_PE, 0% of its taxa have a >=97% neighbour vs ~59% in
+#   the real community -- so trimming cannot merge anything and the null-model
+#   p-value saturates at its floor.
+#
+#   ntaxas may be set below the study's ASV count to save runtime: families are
+#   emitted whole, so per-taxon structure is preserved (unlike subsampling taxa,
+#   which separates relatives and destroys it).
+# ------------------------------------------------------------------------------
+build_structure_matched_community <- function(db_seq, structure, ntaxas, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  W <- unique(Biostrings::width(db_seq))
+  if (length(W) != 1L)
+    stop("build_structure_matched_community: reference pool is not fixed-width.")
+
+  occupied  <- structure$occupied
+  vprof     <- structure$var_profile
+  close_ids <- structure$close_ids
+  fam_sizes <- structure$fam_sizes
+  ws <- structure$win_start; we <- structure$win_end
+  blank <- strsplit(paste(rep("-", W), collapse = ""), "", fixed = TRUE)[[1]]
+
+  mutate_in_window <- function(ch, target_identity) {
+    pos <- occupied[ch[occupied] %in% c("A", "C", "G", "T")]
+    if (length(pos) == 0) return(ch)
+    n_mut <- min(max(1L, round(length(pos) * (1 - target_identity))), length(pos))
+    w <- vprof[match(pos, occupied)]
+    if (sum(w) <= 0) w <- rep(1, length(pos))
+    for (i in sample(pos, n_mut, replace = FALSE, prob = w))
+      ch[i] <- sample(setdiff(c("A", "C", "G", "T"), ch[i]), 1L)
+    ch
+  }
+
+  seed_idx <- sample(seq_along(db_seq), min(length(db_seq), ntaxas))
+  # Inherit each seed's SILVA taxonomy: get_community() parses it from the header
+  # (everything after the first space). Without it every taxon becomes "Unknown",
+  # the community collapses to one taxon at Phylum..Genus, and simulated
+  # dissimilarity is identically zero at all levels above ASV.
+  db_names <- names(db_seq)
+  tax <- character(ntaxas)
+  out <- vector("list", ntaxas); k <- 0L; si <- 1L
+  while (k < ntaxas && si <= length(seed_idx)) {
+    s_ch <- strsplit(as.character(db_seq[[seed_idx[si]]]), "", fixed = TRUE)[[1]]
+    si <- si + 1L
+    .h <- if (!is.null(db_names)) db_names[seed_idx[si - 1L]] else ""
+    .tax <- sub("^[^ ]+[ ]*", "", .h)
+    if (!nzchar(.tax)) .tax <- "Bacteria;Unknown;Unknown;Unknown;Unknown;Unknown;Unknown"
+    keep <- blank; keep[ws:we] <- s_ch[ws:we]
+    k <- k + 1L; out[[k]] <- keep; tax[k] <- .tax
+    fam <- sample(fam_sizes, 1L)
+    if (fam > 1L) for (m in seq_len(fam - 1L)) {
+      if (k >= ntaxas) break
+      k <- k + 1L
+      out[[k]] <- mutate_in_window(keep, sample(close_ids, 1L)); tax[k] <- .tax
+    }
+  }
+  while (k < ntaxas) {
+    k <- k + 1L; .j <- sample.int(k - 1L, 1L)
+    out[[k]] <- mutate_in_window(out[[.j]], sample(close_ids, 1L)); tax[k] <- tax[.j]
+  }
+  res <- Biostrings::DNAStringSet(vapply(out[seq_len(ntaxas)],
+                                         paste, character(1), collapse = ""))
+  names(res) <- sprintf("NULL_%04d %s", seq_len(ntaxas), tax[seq_len(ntaxas)])
+  res
+}
+
+# ---------------------------------------------------------------------------
+# normalise_taxonomy_columns(tax, study)
+# Coerce a taxonomy table to ASV_ID / Taxon / Confidence regardless of the
+# denoising tool that produced it (QIIME2, DADA2, mothur, vsearch, ...).
+#   1. Name match against known aliases (case- and punctuation-insensitive)
+#   2. Content sniff if names fail: a lineage column holds ';' or rank prefixes
+#   3. Confidence auto-scaled to 0-100 so downstream Confidence/100 is correct
+#      (QIIME2 emits 0-1, vsearch/blast emit 0-100)
+# Returns NULL if no lineage column can be identified.
+# ---------------------------------------------------------------------------
+normalise_taxonomy_columns <- function(tax, study = "") {
+  if (is.null(tax) || !ncol(tax)) return(NULL)
+  .canon <- function(x) gsub("[^a-z0-9]", "", tolower(x))
+
+  if (!"Taxon" %in% colnames(tax)) {
+    .al <- c("taxon","assignation","taxonomy","consensuslineage","lineage",
+             "classification","taxonomicassignment","tax","assignment")
+    hit <- which(.canon(colnames(tax)) %in% .al)
+    if (!length(hit)) {
+      looks <- vapply(seq_along(colnames(tax)), function(i) {
+        v <- as.character(tax[[i]]); v <- v[!is.na(v) & nzchar(v)]
+        if (!length(v)) return(FALSE)
+        mean(grepl(";|[dkpcofgs]__", v)) > 0.5
+      }, logical(1))
+      hit <- which(looks)
+    }
+    if (length(hit)) colnames(tax)[hit[1]] <- "Taxon" else return(NULL)
+  }
+
+  if (!"Confidence" %in% colnames(tax)) {
+    .al <- c("confidence","perident","pident","identity","percentidentity",
+             "bootstrap","score","conf")
+    hit <- which(.canon(colnames(tax)) %in% .al & colnames(tax) != "Taxon")
+    if (length(hit)) colnames(tax)[hit[1]] <- "Confidence"
+  }
+  if (!"Confidence" %in% colnames(tax)) {
+    tax$Confidence <- NA_real_
+  } else {
+    tax$Confidence <- suppressWarnings(as.numeric(tax$Confidence))
+  }
+
+  fin <- tax$Confidence[is.finite(tax$Confidence)]
+  if (length(fin) && max(fin) <= 1) tax$Confidence <- tax$Confidence * 100
+  tax$Confidence[!is.finite(tax$Confidence)] <- 0
+
+  tax
+}

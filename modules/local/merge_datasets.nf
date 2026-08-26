@@ -61,6 +61,7 @@ process MERGE_DATASETS {
     export SECAT_SELECTION_FILE="${params.selection_file ?: ''}"
 
     ln -s ${projectDir}/R R 2>/dev/null || true
+    # cache-bust: cross-study sharing baseline from sequence identity
     Rscript ${projectDir}/R/13_merge_datasets.R
 
     # Stage post-consensus outputs to work dir root for Nextflow to capture
