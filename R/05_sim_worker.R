@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   05_sim_worker.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 5 - Simulation Worker (parallel execution)
 # PURPOSE:  Generate one replicate of the null-model degradation curve
 #

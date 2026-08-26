@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   10_gen_verdicts.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 10 — Final Verdict Export
 # PURPOSE:  Export the master verdict table for downstream interactive selection
 #

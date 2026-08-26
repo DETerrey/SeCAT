@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   08_gen_report.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 8 — Per-Study Diagnostic Report Generation
 # PURPOSE:  Generate comprehensive PDF reports with degradation curves, null
 #           model comparisons, changepoint annotations, and verdict summaries.
@@ -2031,7 +2031,7 @@ tryCatch({
         if (length(master_png_files) > 0) {
             message("  -> Combining pages into Master Summary PDF...")
             tryCatch({
-                master_pdf_filename <- file.path(REPORTS_DIR, "MESAP_Master_Summary_Report.pdf")
+                master_pdf_filename <- file.path(REPORTS_DIR, "SeCAT_Master_Summary_Report.pdf")
                 pdf(master_pdf_filename, width = PLOT_WIDTH, height = PLOT_HEIGHT, onefile = TRUE)
                 for (png_file in sort(master_png_files)) {
                     img <- png::readPNG(png_file)

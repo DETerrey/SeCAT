@@ -1,7 +1,7 @@
 
 # ==============================================================================
 # SCRIPT:   00_clean_data.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 0 - Data Cleaning & Quality Control
 # PURPOSE:  Remove contaminant ASVs, filter metadata, and synchronise all study
 #           data files prior to cross-study harmonisation.

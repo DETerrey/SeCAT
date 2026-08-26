@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   validation_taxon_v2.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 11 -- Multi-Tier Ecological Validation
 # PURPOSE:  Validate the harmonised (merged) dataset by comparing pre- and
 #           post-trimming community structure across multiple ecological metrics.

@@ -1,6 +1,6 @@
 # ==============================================================================
 # SCRIPT:   secat_mapping.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # PURPOSE:  Reference mapping engine — aligns study ASV sequences to the SILVA
 #           reference to determine each study's amplicon coordinates.
 #

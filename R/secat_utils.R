@@ -1,6 +1,6 @@
 # ==============================================================================
 # SCRIPT:   secat_utils.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # PURPOSE:  Core utility library — provides all shared functions for data
 #           loading, community simulation, beta-diversity analysis, VSEARCH
 #           clustering, taxonomic processing, and statistical identification

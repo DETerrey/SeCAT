@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   11_select_studies.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    11 - Study Selection
 # PURPOSE:  Interactive two-stage CLI for selecting taxonomic level and studies
 #

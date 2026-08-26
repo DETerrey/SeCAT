@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   00_generate_primers.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 0 — Primer Database Generation (Primer Mode Only)
 # PURPOSE:  Extract primer-specific subsequences from the SILVA reference to
 #           build per-primer reference databases for coordinate mapping.

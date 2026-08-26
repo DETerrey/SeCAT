@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   12_trim_sequences.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    12 - Sequence Trimming (Standardisation)
 # PURPOSE:  Extract the consensus 16S region from SILVA-aligned ASV sequences
 #

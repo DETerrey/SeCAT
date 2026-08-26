@@ -65,6 +65,10 @@ process AGGREGATE {
     export SECAT_VERDICT_TOLERANCE_BP="${params.verdict_consensus_tolerance_bp}"
     export SECAT_CONSENSUS_OPT_THRESHOLD="${params.consensus_optimization_threshold}"
     export SECAT_MIN_CONSENSUS_STUDIES="${params.min_consensus_studies}"
+    export SECAT_NULL_MODEL_MIN_TRIM_BP="${params.null_model_min_trim_bp ?: 5}"
+    export SECAT_DISTANCE_CUTOFF_MIN_BP="${params.distance_cutoff_min_trim_bp ?: 5}"
+    export SECAT_MIN_CONSENSUS_COVERAGE="${params.min_consensus_coverage ?: 0.50}"
+    export SECAT_EXCLUDE_UNSTABLE="${params.exclude_unstable_from_consensus == null ? true : params.exclude_unstable_from_consensus}"
     export SECAT_OUTDIR="./output"
     export SECAT_PROJECTDIR="${projectDir}"
     Rscript ${projectDir}/R/07_aggregate.R

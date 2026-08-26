@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   13_merge_datasets.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    13 - Dataset Merging (MetaASV Construction)
 # PURPOSE:  Merge trimmed ASV sequences across studies into a unified MetaASV dataset
 #

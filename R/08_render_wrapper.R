@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   08_render_wrapper.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 8 (auxiliary) — Report Rendering Wrapper
 # PURPOSE:  Thin wrapper that invokes rmarkdown::render for a single study
 #

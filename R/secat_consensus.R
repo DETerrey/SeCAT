@@ -1,6 +1,6 @@
 # ==============================================================================
 # SCRIPT:   secat_consensus.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # PURPOSE:  Compute the maximal overlapping 16S consensus region across studies
 #
 # OVERVIEW:

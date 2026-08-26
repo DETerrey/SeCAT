@@ -1,6 +1,6 @@
 # ==============================================================================
 # SCRIPT:   04_prepare_sims.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 4 - Simulation Planning
 # PURPOSE:  Generate the simulation task matrix and SILVA reference subset
 #

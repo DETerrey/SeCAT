@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   02_study_mapping.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 2 — Individual Study Coordinate Mapping (Worker)
 # PURPOSE:  Align one study's ASVs to the SILVA reference and determine its
 #           amplicon start/end coordinates in reference alignment space.

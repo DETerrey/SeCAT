@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
 # SCRIPT:   06_analyse_real.R
-# PIPELINE: SeCAT v4.1 (Sequence Consensus Amplicon Trimming)
+# PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 6 — Real Data Trimming Analysis (Worker)
 # PURPOSE:  Progressively trim one study's sequences and measure beta-diversity
 #           degradation at each step to build the real degradation curve.

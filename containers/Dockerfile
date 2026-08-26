@@ -1,4 +1,4 @@
-# SeCAT v5.0.0
+# SeCAT v5.0.1
 FROM rocker/r-ver:4.3.2
 ENV LC_ALL=C
 ENV PATH=/usr/local/bin:/usr/bin:/bin
@@ -33,6 +33,6 @@ RUN R --no-save --no-restore -e "if(!requireNamespace('BiocManager',quietly=TRUE
 RUN R --no-save --no-restore -e "pkgs<-c('ggplot2','Biostrings','DECIPHER','vegan','changepoint','magick','here','data.table','irr','ape','igraph','microeco','SpiecEasi'); m<-pkgs[!sapply(pkgs,requireNamespace,quietly=TRUE)]; if(length(m)>0) stop(paste('Missing:',paste(m,collapse=', '))); message('All packages verified OK')"
 RUN vsearch --version
 LABEL org.opencontainers.image.title="SeCAT"
-LABEL org.opencontainers.image.description="Sequence Consensus Amplicon Trimming v5.0.0"
-LABEL org.opencontainers.image.version="5.0.0"
+LABEL org.opencontainers.image.description="Sequence Consensus Amplicon Trimming v5.0.1"
+LABEL org.opencontainers.image.version="5.0.1"
 LABEL org.opencontainers.image.source="https://github.com/DETerrey/SeCAT"
