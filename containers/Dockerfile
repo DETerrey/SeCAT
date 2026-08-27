@@ -8,7 +8,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
         libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
         libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
         libgit2-dev libmagick++-dev imagemagick build-essential \
-        gfortran libblas-dev liblapack-dev \
+        gfortran libblas-dev liblapack-dev libglpk-dev \
         zlib1g-dev libbz2-dev liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN VSEARCH_VERSION=2.23.0 && \
@@ -20,7 +20,7 @@ RUN VSEARCH_VERSION=2.23.0 && \
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://packagemanager.posit.co/cran/__linux__/jammy/2026-08-01')); install.packages(c('ggplot2','dplyr','tidyr','readr','purrr','tibble','stringr','forcats','lubridate','tidyverse'), dependencies=TRUE)"
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://packagemanager.posit.co/cran/__linux__/jammy/2026-08-01')); install.packages(c('data.table','here','vegan','changepoint','magick','patchwork','gridExtra','ggrepel','fs','scales','digest'), dependencies=TRUE)"
 RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://packagemanager.posit.co/cran/__linux__/jammy/2026-08-01')); install.packages(c('irr','ape','igraph','RColorBrewer','microeco'), dependencies=TRUE)"
-RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://packagemanager.posit.co/cran/__linux__/jammy/2026-08-01')); install.packages(c('remotes','Rcpp','RcppArmadillo','glmnet','pulsar','VGAM')); install.packages('huge', dependencies=FALSE); for (p in c('Rcpp','RcppArmadillo','Matrix','glmnet','pulsar','huge','VGAM')) if(!requireNamespace(p, quietly=TRUE)) stop(paste('dependency failed to install:', p))"
+RUN R --no-save --no-restore -e "options(repos=c(CRAN='https://packagemanager.posit.co/cran/__linux__/jammy/2026-08-01')); install.packages(c('remotes','Rcpp','RcppArmadillo','glmnet','pulsar','huge','VGAM')); for (p in c('Rcpp','RcppArmadillo','Matrix','igraph','glmnet','pulsar','huge','VGAM')) if(!requireNamespace(p, quietly=TRUE)) stop(paste('dependency failed to load:', p))"
 RUN set -e; \
     apt-get update -qq && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*; \
     mkdir -p /root/.R && printf 'CXX11STD = -std=gnu++17\nCXX14STD = -std=gnu++17\n' > /root/.R/Makevars; \
