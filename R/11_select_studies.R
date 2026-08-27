@@ -46,7 +46,7 @@ suppressPackageStartupMessages(library(tibble))
 })
 
 cat("\n================================================================================\n")
-cat("                    MESAP FINAL TRIM SELECTION WIZARD                           \n")
+cat("                    SeCAT FINAL TRIM SELECTION WIZARD                           \n")
 cat("================================================================================\n")
 
 # --- 1. Load Raw Verdict Data (All Levels) ---

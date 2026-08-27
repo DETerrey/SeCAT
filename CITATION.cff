@@ -1,11 +1,15 @@
 cff-version: 1.2.0
 message: "If you use SeCAT, please cite both the software and the paper (preferred-citation)."
 title: "SeCAT: Sequence Consensus Amplicon Trimming"
-version: 5.0.1
-date-released: 2026-08-26
+version: 5.0.2
+date-released: '2026-08-26'
 authors:
   - family-names: Terrey
     given-names: David
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22113431
+    description: "Concept DOI — resolves to the latest release"
 repository-code: "https://github.com/DETerrey/SeCAT"
 license: MIT
 keywords:

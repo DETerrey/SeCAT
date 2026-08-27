@@ -843,5 +843,5 @@ if (validation_issues > 0) {
 } else {
   message("✅ All studies validated successfully!")
 }
-message("Use secat_manifest_clean.tsv for downstream MESAP runs.")
+message("Use secat_manifest_clean.tsv for downstream SeCAT runs.")
 message("========================================================")

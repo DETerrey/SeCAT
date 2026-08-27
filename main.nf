@@ -66,7 +66,7 @@ workflow {
 
     log.info """
     ============================================================
-      SeCAT v5.0.1 (Nextflow)
+      SeCAT v5.0.2 (Nextflow)
     ============================================================
       Manifest        : ${params.manifest}
       Reference DB    : ${params.reference_db}

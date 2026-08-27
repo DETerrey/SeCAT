@@ -74,7 +74,7 @@ check_pre() {
 
 check_post1() {
   hdr "POST PHASE 1 (verdicts + report)"
-  [ -f "$FINAL/$RPT/MESAP_Master_Summary_Report.pdf" ] && ok "master report ($RPT/MESAP_Master_Summary_Report.pdf)" || bad "master report missing"
+  [ -f "$FINAL/$RPT/SeCAT_Master_Summary_Report.pdf" ] && ok "master report ($RPT/SeCAT_Master_Summary_Report.pdf)" || bad "master report missing"
   local n; n=$(find "$FINAL/$RPT/per_study" -name '*.pdf' 2>/dev/null | wc -l); [ "$n" -gt 0 ] && ok "$n per-study report(s)" || bad "no per-study reports"
   [ -f "$FINAL/$VD/master_verdict_table.csv" ] && ok "master_verdict_table.csv" || bad "master_verdict_table.csv missing"
 }

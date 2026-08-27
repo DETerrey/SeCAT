@@ -1445,7 +1445,7 @@ Is_Warning_Only = !is.na(Consensus_Status) & Consensus_Status == "WARNING_SINGLE
 
     if (data_max > 5000) {
         v_regions   <- v_regions_silva_aln
-        axis_label  <- "SILVA 138.1 SSU Alignment Column"
+        axis_label  <- Sys.getenv("SECAT_REF_LABEL", "SILVA 138.2 SSU Alignment Column")
     } else {
         v_regions   <- v_regions_ecoli
         axis_label  <- "E. coli 16S Position (bp)"
@@ -1903,7 +1903,7 @@ if (!SKIP_INDIVIDUAL) {
                     plot_grid <- wrap_plots(p1, p2, p3, p4, nrow = 2)
                     annotated_plot_grid <- plot_grid +
                         plot_annotation(
-                            title = paste("MESAP Analysis Report:", study_name),
+                            title = paste("SeCAT Analysis Report:", study_name),
                             subtitle = subtitle_txt,
                             caption = paste("Generated:", Sys.Date(), "| Primer:", primer, "| Valid data to", obs_max_step_bp, "alignment columns"),
                             theme = theme(plot.title = element_text(size = 18, face = "bold"))

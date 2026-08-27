@@ -71,7 +71,7 @@ if (!exists("SECAT_MANIFEST_PATH")) SECAT_MANIFEST_PATH <- "secat_manifest_clean
 
 # Print config summary
 cat("=============================================================\n")
-cat("  MESAP Pipeline Configuration Summary\n")
+cat("  SeCAT Pipeline Configuration Summary\n")
 cat("=============================================================\n")
 cat(sprintf("  Reference Database:      %s\n", basename(REFERENCE_DB_PATH)))
 cat(sprintf("  Analysis Mode:           %s\n", ANALYSIS_MODE))

@@ -545,7 +545,7 @@ SIMULATION_CHIMERA_RATE       <- .secat_env("SECAT_SIM_CHIMERA_RATE",      0.02,
 # ==============================================================================
 message("✓ Configuration loaded successfully (Nextflow mode)")
 message(strrep("=", 61))
-message("  MESAP Pipeline Configuration Summary")
+message("  SeCAT Pipeline Configuration Summary")
 message(strrep("=", 61))
 message(paste("  Reference Database: ", basename(REFERENCE_DB_PATH)))
 message(paste("  Analysis Mode:      ", ANALYSIS_MODE))
