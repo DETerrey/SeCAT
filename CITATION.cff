@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use SeCAT, please cite both the software and the paper (preferred-citation)."
 title: "SeCAT: Sequence Consensus Amplicon Trimming"
-version: 5.0.3
+version: 5.0.5
 date-released: '2026-08-27'
 authors:
   - family-names: Terrey

@@ -1,6 +1,6 @@
 # SeCAT — Sequence Consensus Amplicon Trimming
 
-**Version 5.0.3**
+**Version 5.0.5**
 
 SeCAT is a Nextflow DSL2 pipeline that harmonises independently published 16S rRNA
 amplicon datasets sequenced with *different primer pairs* into a single feature table of
@@ -34,18 +34,18 @@ taxonomic composition and co-occurrence network structure.
 
 - Nextflow >= 25.10 (26.04 recommended), DSL2
 - Singularity/Apptainer (recommended on HPC) or Docker
-- The published container: ghcr.io/deterrey/secat:v5.0.3
+- The published container: ghcr.io/deterrey/secat:5.0.5
   (R 4.3.2, DECIPHER 2.30.0, changepoint 2.3, vegan 2.7-5, microeco 2.3.0,
   SpiecEasi 1.1.2, VSEARCH 2.23.0, and dependencies)
 - The SILVA 138.2 SSURef NR99 **full-length aligned** FASTA as the reference
 
 ## Quick start
 
-    nextflow pull DETerrey/SeCAT -r v5.0.3
+    nextflow pull DETerrey/SeCAT -r v5.0.5
     cp params.yaml my_params.yaml       # set manifest, reference_db, outdir, bind_paths
-    nextflow run DETerrey/SeCAT -r v5.0.3 -profile slurm,singularity -params-file my_params.yaml
+    nextflow run DETerrey/SeCAT -r v5.0.5 -profile slurm,singularity -params-file my_params.yaml
     # review 1_report/ and edit selection_roster.txt, then Phase 2:
-    nextflow run DETerrey/SeCAT -r v5.0.3 -profile slurm,singularity -params-file my_params.yaml \
+    nextflow run DETerrey/SeCAT -r v5.0.5 -profile slurm,singularity -params-file my_params.yaml \
         --step standardize -resume
 
 Executor profiles: slurm, sge, local. Container profiles: singularity, docker.
@@ -116,7 +116,7 @@ Intermediates are removed after a successful run unless keep_intermediates: true
 ## Reproducing the SeCAT paper
 
 The paper run's configuration is preserved under examples/paper_run/
-(params_paper.yaml, manifest, roster). Run it against release v5.0.3.
+(params_paper.yaml, manifest, roster). Run it against release v5.0.5.
 
 ## Citation
 
