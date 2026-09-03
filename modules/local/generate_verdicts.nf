@@ -5,14 +5,12 @@ process GENERATE_VERDICTS {
     publishDir(path: { "${params.outdir}/aggregated_data" }, mode: 'copy')
     // Duplicate final verdicts into final_outputs/verdicts/
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "verdict_data_all_levels.csv")
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verdicts_dir}" }, mode: 'copy', pattern: "final_trim_verdicts.csv")
 
     input:
     path master_verdict_table
 
     output:
     path "verdict_data_all_levels.csv", emit: verdict_data
-    path "final_trim_verdicts.csv",     emit: final_verdicts, optional: true
 
     script:
     """
@@ -22,6 +20,5 @@ process GENERATE_VERDICTS {
     export SECAT_PROJECTDIR="${projectDir}"
     Rscript ${projectDir}/R/10_gen_verdicts.R
     cp output/aggregated_data/verdict_data_all_levels.csv ./verdict_data_all_levels.csv
-    cp output/aggregated_data/final_trim_verdicts.csv     ./final_trim_verdicts.csv 2>/dev/null || true
     """
 }

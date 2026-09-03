@@ -47,7 +47,7 @@ process RUN_SIMULATION {
     mkdir -p intermediate
     cp ${sim_reference_subset} intermediate/simulation_reference_subset.fasta 2>/dev/null || true
     cp ${study_coords}   intermediate/study_alignment_coords.csv 2>/dev/null || true
-    cp ${consensus_info} intermediate/consensusregioninfo.csv    2>/dev/null || true
+    cp ${consensus_info} intermediate/consensus_region_info.csv    2>/dev/null || true
     echo "task_id,num_steps,amplicon_length,simulation_seed" > intermediate/simulation_tasks.csv
     echo "${task_id},${num_steps},${amplicon_length},${seed}" >> intermediate/simulation_tasks.csv
     export SECAT_PROJECTDIR="${projectDir}"

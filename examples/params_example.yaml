@@ -43,7 +43,7 @@ analysis_mode: "study"
 
 # ── PIPELINE FLOW ─────────────────────────────────────────────────────────────
 # auto_trim=false  → pipeline pauses after verdicts. You manually review,
-#                    edit selection_roster.txt, then re-run with -entry STANDARDIZE.
+#                    edit the roster file, then re-run with --step standardize -resume.
 # auto_trim=true   → end-to-end, no pause. Use only on previously vetted data.
 auto_trim:      false
 run_validation: true

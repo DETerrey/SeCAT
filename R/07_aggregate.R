@@ -26,7 +26,7 @@
 #     containing dissimilarity curves, retention data, OTU tables, and metadata
 #   - output/simulation_results/<task_id>/<seed>/results.rds — per-simulation
 #     replicate RDS files with randomised degradation curves
-#   - output/intermediate/consensusregioninfo.csv — outlier study list
+#   - output/intermediate/consensus_region_info.csv — outlier study list
 #
 # OUTPUTS:
 #   - output/aggregated_data/master_verdict_table.csv — KEEP/EXCLUDE verdicts
@@ -964,7 +964,7 @@ main <- function() {
   log_and_flush("--- Starting Main Processing Loop (One Study at a Time) ---")
 
   # Load outlier list once at the start
-  consensus_file <- file.path(OUTDIR, "intermediate/consensusregioninfo.csv")
+  consensus_file <- file.path(OUTDIR, "intermediate/consensus_region_info.csv")
   outlier_studies <- character(0)
 
   if (file.exists(consensus_file)) {

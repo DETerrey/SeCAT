@@ -4,7 +4,7 @@ process PREPARE_SIMS {
     label 'mem_4g'
     publishDir(path: { "${params.outdir}/intermediate" }, mode: 'copy')
     // Consensus region info goes to final_outputs/coordinates/ for user interpretation
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_coordinates_dir}" }, mode: 'copy', pattern: "consensusregioninfo.csv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_coordinates_dir}" }, mode: 'copy', pattern: "consensus_region_info.csv")
 
     input:
     path study_coords
@@ -15,7 +15,7 @@ process PREPARE_SIMS {
     output:
     path "simulation_tasks.csv",              emit: sim_tasks_csv
     path "simulation_reference_subset.fasta", emit: sim_reference_subset
-    path "consensusregioninfo.csv",           emit: consensus_info
+    path "consensus_region_info.csv",           emit: consensus_info
     path "null_structure.rds",                emit: null_structure, optional: true
     path "study_alignment_coords.csv",        emit: study_align_coords, optional: true
 
@@ -45,7 +45,7 @@ process PREPARE_SIMS {
     Rscript ${projectDir}/R/04_prepare_sims.R
     cp ./intermediate/simulation_tasks.csv              ./simulation_tasks.csv
     cp ./intermediate/simulation_reference_subset.fasta ./simulation_reference_subset.fasta
-    cp ./intermediate/consensusregioninfo.csv           ./consensusregioninfo.csv
+    cp ./intermediate/consensus_region_info.csv           ./consensus_region_info.csv
     cp ./intermediate/study_alignment_coords.csv        ./study_alignment_coords.csv 2>/dev/null || true
     """
 }

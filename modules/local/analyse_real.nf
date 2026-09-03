@@ -42,7 +42,7 @@ process ANALYSE_REAL {
     export SECAT_OUTDIR="."
     mkdir -p output/intermediate/aligned_fastas output/real_data_results/${study_name}
     cp ${study_coords}   output/intermediate/study_alignment_coords.csv 2>/dev/null || true
-    cp ${consensus_info} output/intermediate/consensusregioninfo.csv    2>/dev/null || true
+    cp ${consensus_info} output/intermediate/consensus_region_info.csv    2>/dev/null || true
     cp ${aligned_fasta}  output/intermediate/aligned_fastas/${study_name}_aligned.fasta
     export SECAT_PROJECTDIR="${projectDir}"
     export SECAT_EXCLUDE_UNSTABLE="${params.exclude_unstable_from_consensus}"

@@ -1112,7 +1112,7 @@ create_amplicon_alignment_plot <- function(master_manifest, master_verdicts, tax
 
     # --- 1. DYNAMIC COORDINATE LOADING ---
     study_coords_path <- file.path(OUTDIR, "intermediate/study_alignment_coords.csv")
-    primer_coords_path <- file.path(OUTDIR, "intermediate/primer_coords_phase1_output.csv")
+    primer_coords_path <- file.path(OUTDIR, "intermediate/primer_coordinates.csv")
 
     target_path <- NULL
     coords_source <- ""
@@ -1223,7 +1223,7 @@ Is_Warning_Only = !is.na(Consensus_Status) & Consensus_Status == "WARNING_SINGLE
     message(paste("   -> Plotting", nrow(amplicon_data), "studies"))
 
     # --- 3. CONSENSUS REGION LOADING FROM FILE (NEW LOGIC) ---
-    consensus_file <- file.path(OUTDIR, "intermediate", "consensusregioninfo.csv")
+    consensus_file <- file.path(OUTDIR, "intermediate", "consensus_region_info.csv")
     outlier_studies <- character(0)
     consensus_start <- NA
     consensus_end <- NA
@@ -1615,8 +1615,11 @@ create_method_performance_plot <- function() {
 # Purpose:  Skip already-generated reports when FORCE_REGENERATE is FALSE.
 # Params:   study_name, primer — used to construct expected filename.
 # Returns:  logical.
+# Sanitise a manifest value for use in a filename (spaces, slashes -> underscore)
+sanitise_for_filename <- function(x) gsub("[^A-Za-z0-9._-]", "_", x)
+
 check_report_exists <- function(study_name, primer) {
-  file.exists(file.path(PER_STUDY_DIR, paste0("Report_", study_name, "_", primer, ".pdf")))
+  file.exists(file.path(PER_STUDY_DIR, paste0("Report_", study_name, "_", sanitise_for_filename(primer), ".pdf")))
 }
 
 message("--- Processing studies with file existence checks ---")
@@ -1909,7 +1912,7 @@ if (!SKIP_INDIVIDUAL) {
                             theme = theme(plot.title = element_text(size = 18, face = "bold"))
                         )
 
-                    temp_png_filename <- file.path(temp_png_dir, paste0("page_", match(current_level, taxonomic_levels_to_plot), ".png"))
+                    temp_png_filename <- file.path(temp_png_dir, sprintf("page_%02d_%s.png", match(current_level, taxonomic_levels_to_plot), tolower(current_level)))
                     ggsave(temp_png_filename, annotated_plot_grid, width = PLOT_WIDTH, height = PLOT_HEIGHT, dpi = PLOT_DPI, bg = "white")
                     png_files_for_pdf <- c(png_files_for_pdf, temp_png_filename)
                     message(paste("    ✅ Created page for level:", current_level))
@@ -1926,7 +1929,7 @@ if (!SKIP_INDIVIDUAL) {
             if (length(png_files_for_pdf) > 0) {
                 message(paste("  → Creating PDF with", length(png_files_for_pdf), "pages..."))
                 tryCatch({
-                    pdf_filename <- file.path(PER_STUDY_DIR, paste0("Report_", study_name, "_", primer, ".pdf"))
+                    pdf_filename <- file.path(PER_STUDY_DIR, paste0("Report_", study_name, "_", sanitise_for_filename(primer), ".pdf"))
                     pdf(pdf_filename, width = PLOT_WIDTH, height = PLOT_HEIGHT, onefile = TRUE)
                     for (png_file in png_files_for_pdf) {
                         img <- png::readPNG(png_file)
@@ -1982,7 +1985,7 @@ tryCatch({
         })
 
         if (!is.null(alignment_plot)) {
-            master_plots_list[[paste0("alignment_", level)]] <- alignment_plot
+            master_plots_list[[paste0("alignment_", tolower(level))]] <- alignment_plot
             message(paste("    [OK] Created alignment plot for", level))
         } else {
             message(paste("    [SKIP] Skipping alignment plot for", level, "(no data or error)"))

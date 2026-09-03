@@ -21,7 +21,7 @@ include { VALIDATE            } from './modules/local/validate'
 
 workflow {
     // Nextflow 26: -entry removed; dispatch named workflows via --step
-    if( params.step == 'standardize' ) {
+    if( params.step in ['standardize', 'standardise'] ) {
         STANDARDIZE()
     }
     else {
@@ -228,15 +228,17 @@ workflow {
                 clean_manifest,
                 Channel.value(file('NO_ROSTER')),
                 PREPARE_SIMS.out.consensus_info.first(),
-                TRIM_SEQUENCES.out.trim_summary
+                TRIM_SEQUENCES.out.trim_summary,
+                MERGE_DATASETS.out.sharing.ifEmpty(file('NO_SHARING'))
             )
         }
     } else {
         log.info """
         ============================================================
-        Pipeline complete. Review verdicts then run:
-          Rscript R/11_select_studies.R
-          nextflow run main.nf --step standardize -resume
+        Pipeline complete. Review 1_report/ and 3_verdicts/, write the
+          studies to keep into your roster file (one study_name per line,
+          selection_mode: roster + selection_file in params), then:
+            nextflow run main.nf --step standardize -resume
         ============================================================
         """.stripIndent()
     }
@@ -247,7 +249,7 @@ workflow {
 workflow STANDARDIZE {
 
     selected_file  = file(params.selection_file, checkIfExists: true)
-    consensus_info = file("${params.outdir}/intermediate/consensusregioninfo.csv",
+    consensus_info = file("${params.outdir}/intermediate/consensus_region_info.csv",
                           checkIfExists: true)
     study_coords   = file("${params.outdir}/intermediate/study_alignment_coords.csv",
                           checkIfExists: true)
@@ -285,7 +287,8 @@ workflow STANDARDIZE {
             file("${params.outdir}/cleaned_data/secat_manifest_clean.tsv", checkIfExists: true),
             selected_file,
             consensus_info,
-            TRIM_SEQUENCES.out.trim_summary
+            TRIM_SEQUENCES.out.trim_summary,
+            MERGE_DATASETS.out.sharing.ifEmpty(file('NO_SHARING'))
         )
     }
 }

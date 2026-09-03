@@ -3,7 +3,8 @@ process MERGE_DATASETS {
     label 'mem_30g'
     // ── Existing publishDir layout (preserved for -resume compatibility) ──
     publishDir(path: { "${params.outdir}/meta_analysis" }, mode: 'copy', pattern: "combined_*")
-    publishDir(path: { "${params.outdir}/meta_analysis" }, mode: 'copy', pattern: "asv_mapping_final.tsv")
+    publishDir(path: { "${params.outdir}/meta_analysis" }, mode: 'copy', pattern: "asv_metaasv_map.tsv")
+    publishDir(path: { "${params.outdir}/meta_analysis" }, mode: 'copy', pattern: "cross_study_sharing.csv")
     publishDir(path: { "${params.outdir}/comparison" }, mode: 'copy', pattern: "pre_consensus/*.tsv")
     publishDir(path: { "${params.outdir}/comparison" }, mode: 'copy', pattern: "post_consensus/*.tsv")
 
@@ -11,7 +12,8 @@ process MERGE_DATASETS {
     // These duplicate the published files into ${params.final_outputs}/ so
     // downstream users only need to look in one place.
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_tables_dir}" }, mode: 'copy', pattern: "combined_*")
-    publishDir(path: { "${params.final_outputs}/${params.final_outputs_tables_dir}" }, mode: 'copy', pattern: "asv_mapping_final.tsv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_tables_dir}" }, mode: 'copy', pattern: "asv_metaasv_map.tsv")
+    publishDir(path: { "${params.final_outputs}/${params.final_outputs_verification_dir}" }, mode: 'copy', pattern: "cross_study_sharing.csv")
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_comparison_dir}" }, mode: 'copy', pattern: "pre_consensus/*.tsv")
     publishDir(path: { "${params.final_outputs}/${params.final_outputs_comparison_dir}" }, mode: 'copy', pattern: "post_consensus/*.tsv")
 
@@ -26,7 +28,8 @@ process MERGE_DATASETS {
     path "combined_feature_table.tsv",      emit: combined_otu
     path "combined_taxonomy.tsv",           emit: combined_tax
     path "combined_metadata.tsv",           emit: combined_meta,        optional: true
-    path "asv_mapping_final.tsv",           emit: asv_mapping,          optional: true
+    path "asv_metaasv_map.tsv",           emit: asv_mapping,          optional: true
+    path "cross_study_sharing.csv",         emit: sharing,              optional: true
     path "pre_consensus/feature_table.tsv", emit: pre_otu
     path "pre_consensus/taxonomy.tsv",      emit: pre_tax
     path "pre_consensus/metadata.tsv",      emit: pre_meta,             optional: true
@@ -69,7 +72,8 @@ process MERGE_DATASETS {
     cp meta_analysis/combined_feature_table.tsv    ./                       2>/dev/null || true
     cp meta_analysis/combined_taxonomy.tsv         ./                       2>/dev/null || true
     cp meta_analysis/combined_metadata.tsv         ./                       2>/dev/null || true
-    cp meta_analysis/asv_mapping_final.tsv         ./                       2>/dev/null || true
+    cp meta_analysis/asv_metaasv_map.tsv         ./                       2>/dev/null || true
+    cp meta_analysis/cross_study_sharing.csv       ./                       2>/dev/null || true
 
     cp meta_analysis/combined_feature_table.tsv    post_consensus/feature_table.tsv  2>/dev/null || true
     cp meta_analysis/combined_taxonomy.tsv         post_consensus/taxonomy.tsv       2>/dev/null || true

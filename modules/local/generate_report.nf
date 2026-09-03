@@ -29,7 +29,7 @@ process GENERATE_REPORT {
     done
 
     cp ${study_coords} output/intermediate/study_alignment_coords.csv
-    cp ${consensus_info} output/intermediate/consensusregioninfo.csv
+    cp ${consensus_info} output/intermediate/consensus_region_info.csv
 
     export SECAT_MANIFEST="${params.manifest}"
     export SECAT_ANALYSIS_MODE="${params.analysis_mode}"

@@ -16,13 +16,13 @@
 # INPUTS:
 #   - SECAT_MANIFEST_PATH          TSV manifest listing studies and primer sets
 #   - REFERENCE_DB_PATH            Full SILVA reference FASTA (DNA or RNA)
-#   - output/intermediate/primer_coords_phase1_output.csv  (primer mode)
+#   - output/intermediate/primer_coordinates.csv  (primer mode)
 #   - output/intermediate/study_alignment_coords.csv       (study mode)
 #
 # OUTPUTS:
 #   - output/intermediate/simulation_tasks.csv             Master job list
 #   - output/intermediate/simulation_reference_subset.fasta Ground-truth community DB
-#   - output/intermediate/consensusregioninfo.csv          Consensus region summary (study mode)
+#   - output/intermediate/consensus_region_info.csv          Consensus region summary (study mode)
 #   - output/intermediate/primer_max_trim_steps.csv        Per-primer step counts (primer mode)
 #
 # DEPENDENCIES:
@@ -281,7 +281,7 @@ main <- function() {
 
     if (ANALYSIS_MODE == "primer") {
         log_and_flush("\n=== Executing in 'primer' mode. ===")
-        coords_path <- file.path(OUTDIR, "intermediate/primer_coords_phase1_output.csv")
+        coords_path <- file.path(OUTDIR, "intermediate/primer_coordinates.csv")
         primer_coords <- readr::read_csv(coords_path, show_col_types = FALSE)
         all_primers <- unique(primer_coords$primer_name)
 
@@ -424,7 +424,7 @@ main <- function() {
         )
 
         # Write consensus info for use by simulation workers and real-data analysis
-        consensus_path <- file.path(OUTDIR, "intermediate/consensusregioninfo.csv")
+        consensus_path <- file.path(OUTDIR, "intermediate/consensus_region_info.csv")
         readr::write_csv(consensus_info, consensus_path)
         log_and_flush(sprintf("✓ Saved consensus region info to %s", consensus_path))
 

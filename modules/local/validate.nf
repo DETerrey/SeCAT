@@ -20,6 +20,7 @@ input:
     path roster,          stageAs: 'roster.txt'
     path consensus_info,  stageAs: 'consensus_info.csv'
     path trim_summary_in, stageAs: 'trim_summary_in.csv'
+    path sharing_in,      stageAs: 'cross_study_sharing_in.csv'
 
     output:
     path "outputs/**",          emit: validation_outputs
@@ -45,11 +46,12 @@ input:
 
     # Stage SeCAT intermediate outputs for coordinate verification (Tier 0C)
     cp -r ${aggregated_dir}/* output/ 2>/dev/null || true
-    cp ${asv_mapping} asv_mapping_final.tsv        2>/dev/null || true
+    cp ${asv_mapping} asv_metaasv_map.tsv        2>/dev/null || true
+    cp cross_study_sharing_in.csv cross_study_sharing.csv 2>/dev/null || true
 
     # --- Tier 0 staging (previously missing; Tier 0A-0C were silently skipped) ---
     # 0C inputs: consensus coordinates + trim summary at the paths the R expects
-    cp consensus_info.csv  output/intermediate/consensusregioninfo.csv   2>/dev/null || true
+    cp consensus_info.csv  output/intermediate/consensus_region_info.csv   2>/dev/null || true
     cp trim_summary_in.csv output/standardized_datasets/trim_summary.csv 2>/dev/null || true
     # 0A/0B input: pre-consensus (cleaned, untrimmed) sequences, concatenated from
     # the cleaned per-study FASTAs in the clean manifest, restricted to rostered
@@ -68,7 +70,7 @@ input:
 
     # cache-bust: sharing baseline read from cross_study_sharing.csv
 
-    Rscript ${projectDir}/R/validation_taxon_v2.R \
+    Rscript ${projectDir}/R/validation_taxon.R \
         0 \
         FALSE \
         2>&1 | tee logs/validation.log

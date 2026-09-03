@@ -27,7 +27,7 @@
 #   - SECAT_MANIFEST_PATH: cleaned manifest TSV
 #   - output/intermediate/study_alignment_coords.csv (study coordinates)
 #   - output/intermediate/aligned_fastas/<study>_aligned.fasta
-#   - output/intermediate/consensusregioninfo.csv (consensus boundaries)
+#   - output/intermediate/consensus_region_info.csv (consensus boundaries)
 #
 # OUTPUTS:
 #   - output/real_data_results/<study>/<study>_results.rds
@@ -141,8 +141,8 @@ if (ANALYSIS_MODE == "primer") {
     # ---------------------------------------------------------
     # PRIMER MODE: Theoretical Clique Consensus
     # ---------------------------------------------------------
-    coords_path <- file.path("output/intermediate/primer_coords_phase1_output.csv")
-    if (!file.exists(coords_path)) stop("[FATAL] primer_coords_phase1_output.csv not found.")
+    coords_path <- file.path("output/intermediate/primer_coordinates.csv")
+    if (!file.exists(coords_path)) stop("[FATAL] primer_coordinates.csv not found.")
 
     # 1. Load Primer Database (Dictionary of Primer Name -> Coords)
     primer_db <- readr::read_csv(coords_path, show_col_types = FALSE)

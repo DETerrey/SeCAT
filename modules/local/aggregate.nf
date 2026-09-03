@@ -34,7 +34,7 @@ process AGGREGATE {
     # cache-bust: excluded_studies.csv pre-assessment audit table
     mkdir -p output/intermediate output/real_data_results output/simulation_results aggregated_data
     cp ${study_coords}   output/intermediate/study_alignment_coords.csv 2>/dev/null || true
-    cp ${consensus_info} output/intermediate/consensusregioninfo.csv    2>/dev/null || true
+    cp ${consensus_info} output/intermediate/consensus_region_info.csv    2>/dev/null || true
     for f in *_results.rds; do
         [[ "\$f" == *__seed_* ]] && continue
         study=\$(basename \$f _results.rds)

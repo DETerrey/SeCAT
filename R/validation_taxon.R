@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # ==============================================================================
-# SCRIPT:   validation_taxon_v2.R
+# SCRIPT:   validation_taxon.R
 # PIPELINE: SeCAT v5.0.1 (Sequence Consensus Amplicon Trimming)
 # STAGE:    Stage 11 -- Multi-Tier Ecological Validation
 # PURPOSE:  Validate the harmonised (merged) dataset by comparing pre- and
@@ -25,7 +25,7 @@
 #   Tier 1D: Rank abundance curve preservation -- per-sample Spearman rho on
 #            sorted relative abundances; tests dominance gradient stability.
 #   Tier 2A: Cross-study feature sharing -- MetaASV sharing rate at ASV level
-#            (via asv_mapping_final.tsv), pairwise Jaccard at Genus/Family.
+#            (via asv_metaasv_map.tsv), pairwise Jaccard at Genus/Family.
 #   Tier 3A: Taxonomic composition -- stacked bar plots of top-10 taxa with
 #            consistent colour palette across before/after panels.
 #   Tier 3B: Co-occurrence network stability -- topology metrics (vertices,
@@ -42,14 +42,14 @@
 #   - Post-trimming: feature_table.tsv, taxonomy.tsv, metadata.tsv,
 #     sequences.fasta (in post_consensus/)
 #   - Pre-trimming: matching tables in pre_consensus/
-#   - ASV mapping (asv_mapping_final.tsv -- old-to-new ASV ID correspondence)
+#   - ASV mapping (asv_metaasv_map.tsv -- old-to-new ASV ID correspondence)
 #   - Consensus region info and trim summary CSVs from pipeline output
 #
 # OUTPUTS:
-#   - outputs/ directory: validation_summary.csv, per-tier CSVs, per-level
-#     subdirectories with detailed results
-#   - outputs/figures/ directory: PDF diagnostic plots per tier and level
-#   - outputs/checkpoints/ directory: RDS checkpoints for resumable runs
+#   - output directory: validation_summary.csv, coordinate_verification.csv and
+#     per-level subdirectories holding the numbered diagnostic PDFs, network
+#     files and detailed CSVs
+#   - checkpoints/ subdirectory: RDS checkpoints for resumable runs
 #
 # DEPENDENCIES:
 #   - vegan:      diversity indices, PERMANOVA (adonis2), Mantel, betadisper,
@@ -67,8 +67,8 @@
 #   - modules/local/validate.nf (VALIDATE process in Nextflow pipeline)
 #
 # USAGE:
-#   Rscript validation_taxon_v2.R [START_TIER] [INSTALL_PACKAGES]
-#   Rscript validation_taxon_v2.R /path/to/base START_TIER INSTALL_PACKAGES
+#   Rscript validation_taxon.R [START_TIER] [INSTALL_PACKAGES]
+#   Rscript validation_taxon.R /path/to/base START_TIER INSTALL_PACKAGES
 #
 # Author:  SeCAT Development Team
 # Version: 4.1 (2026-04)
@@ -225,8 +225,8 @@ if (HAS_MECONETCOMP) suppressPackageStartupMessages(library(meconetcomp))
 #       metadata.tsv          -- sample metadata with SampleID and StudyID columns
 #       sequences.fasta       -- (optional) representative sequences
 #     post_consensus/         -- SeCAT-trimmed and merged data (same file formats)
-#     asv_mapping_final.tsv   -- maps original ASV hashes to MetaASV IDs
-#     output/intermediate/    -- consensusregioninfo.csv (from alignment stage)
+#     asv_metaasv_map.tsv   -- maps original ASV hashes to MetaASV IDs
+#     output/intermediate/    -- consensus_region_info.csv (from alignment stage)
 #     output/standardized_datasets/ -- trim_summary.csv (from trimming stage)
 #     outputs/                -- validation results written here
 #       figures/              -- PDF plots
@@ -246,9 +246,9 @@ POST_META   <- file.path(POST_CONSENSUS_DIR, "metadata.tsv")
 POST_FA     <- file.path(POST_CONSENSUS_DIR, "sequences.fasta")     # optional
 
 # SeCAT pipeline outputs for coordinate verification
-CONSENSUS_INFO <- file.path(BASE_DIR, "output/intermediate/consensusregioninfo.csv")
+CONSENSUS_INFO <- file.path(BASE_DIR, "output/intermediate/consensus_region_info.csv")
 TRIM_SUMMARY   <- file.path(BASE_DIR, "output/standardized_datasets/trim_summary.csv")
-ASV_MAPPING    <- file.path(BASE_DIR, "asv_mapping_final.tsv")
+ASV_MAPPING    <- file.path(BASE_DIR, "asv_metaasv_map.tsv")
 
 # Taxonomic resolution levels for the validation loop. Override via environment
 # variable SECAT_VALIDATION_LEVELS (comma-separated, e.g., "ASV,Genus").
@@ -508,12 +508,12 @@ bland_altman_plot <- function(x, y, title = "Bland-Altman",
 #             data_list -- named list of objects to persist
 # Returns:    load_checkpoint returns the stored list, or NULL if not found
 save_checkpoint <- function(id, data_list) {
-  saveRDS(data_list, file.path(CHECKPOINT_DIR, sprintf("ckpt_%s.rds", id)))
+  saveRDS(data_list, file.path(CHECKPOINT_DIR, sprintf("checkpoint_%s.rds", id)))
   cat(sprintf("  ✓ Checkpoint saved [%s]\n", id))
 }
 
 load_checkpoint <- function(id) {
-  fp <- file.path(CHECKPOINT_DIR, sprintf("ckpt_%s.rds", id))
+  fp <- file.path(CHECKPOINT_DIR, sprintf("checkpoint_%s.rds", id))
   if (file.exists(fp)) { cat(sprintf("  ↩ Loading checkpoint [%s]\n", id)); readRDS(fp) }
   else NULL
 }
@@ -659,7 +659,7 @@ if (START_TIER == 0) {
            x = "GC proportion", y = "Density") +
       theme_bw() +
       theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-    ggsave(file.path(PLOTS_DIR, "00b_gc_content.pdf"),
+    ggsave(file.path(PLOTS_DIR, "01_gc_content.pdf"),
            p_gc, width = 8, height = 5)
     cat("  ✓ GC content plot saved\n")
 
@@ -716,11 +716,11 @@ if (START_TIER == 0) {
                 mutate(consensus_start = cons_start,
                        consensus_end   = cons_end,
                        consensus_len   = cons_len),
-              file.path(OUTPUT_DIR, "tier0_coordinate_verification.csv"))
+              file.path(OUTPUT_DIR, "coordinate_verification.csv"))
     cat("  ✓ Coordinate verification table saved\n")
 
   } else {
-    cat("  ⚠ consensusregioninfo.csv or trim_summary.csv not found — skipping Tier 0C\n")
+    cat("  ⚠ consensus_region_info.csv or trim_summary.csv not found — skipping Tier 0C\n")
     cat("    (Run SeCAT pipeline through Stage 12 first)\n")
   }
 
@@ -962,7 +962,7 @@ for (taxa_level in TAXONOMIC_LEVELS) {
                                      xlab  = paste("Mean", m))
   }
   if (length(ba_list) > 0) {
-    ggsave(file.path(level_plot, sprintf("02_%s_alpha_ba.pdf", tolower(taxa_level))),
+    ggsave(file.path(level_plot, sprintf("02_%s_alpha_bland_altman.pdf", tolower(taxa_level))),
            wrap_plots(ba_list, ncol = 2), width = 12, height = 10)
     cat("  ✓ Bland-Altman plots saved\n")
   }
@@ -1099,9 +1099,9 @@ for (taxa_level in TAXONOMIC_LEVELS) {
     p_a <- do.call(beta_a$plot_ordination, plot_args) +
       labs(title = "PCoA after trimming") + theme_bw(base_size = 11)
 
-    ggsave(file.path(level_plot, sprintf("04_%s_pcoa_before.pdf", tolower(taxa_level))),
+    ggsave(file.path(level_plot, sprintf("03_%s_pcoa_before.pdf", tolower(taxa_level))),
            p_b, width = 10, height = 8)
-    ggsave(file.path(level_plot, sprintf("05_%s_pcoa_after.pdf", tolower(taxa_level))),
+    ggsave(file.path(level_plot, sprintf("04_%s_pcoa_after.pdf", tolower(taxa_level))),
            p_a, width = 10, height = 8)
     cat("  ✓ PCoA plots saved\n")
   }, error = function(e) cat("  ⚠ PCoA plots failed:", conditionMessage(e), "\n"))
@@ -1165,7 +1165,7 @@ for (taxa_level in TAXONOMIC_LEVELS) {
               plot.subtitle = element_text(hjust = 0.5, size = 9))
     }
 
-    ggsave(file.path(level_plot, sprintf("06_%s_procrustes.pdf", tolower(taxa_level))),
+    ggsave(file.path(level_plot, sprintf("05_%s_procrustes.pdf", tolower(taxa_level))),
            p_proc, width = 10, height = 8)
     cat("  ✓ Procrustes overlay saved\n")
   }, error = function(e) cat("  ⚠ Procrustes plot failed:", conditionMessage(e), "\n"))
@@ -1227,7 +1227,7 @@ for (taxa_level in TAXONOMIC_LEVELS) {
         theme_bw(base_size = 11) +
         theme(plot.title  = element_text(hjust = 0.5, face = "bold"),
               axis.text.x = element_text(angle = 45, hjust = 1))
-      ggsave(file.path(level_plot, sprintf("07_%s_dispersion.pdf", tolower(taxa_level))),
+      ggsave(file.path(level_plot, sprintf("06_%s_dispersion.pdf", tolower(taxa_level))),
              p_disp, width = 10, height = 6)
       cat("  ✓ Dispersion plot saved\n")
 
@@ -1298,7 +1298,7 @@ for (taxa_level in TAXONOMIC_LEVELS) {
            x = "Spearman rho (before vs after)", y = "Samples") +
       theme_bw() +
       theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-    ggsave(file.path(level_plot, sprintf("08_%s_rank_abundance.pdf", tolower(taxa_level))),
+    ggsave(file.path(level_plot, sprintf("07_%s_rank_abundance.pdf", tolower(taxa_level))),
            p_ra, width = 8, height = 5)
     cat("  ✓ Rank abundance plot saved\n")
 
@@ -1333,7 +1333,7 @@ for (taxa_level in TAXONOMIC_LEVELS) {
     if (taxa_level == "ASV" && file.exists(ASV_MAPPING)) {
       # -----------------------------------------------------------------------
       # ASV level: MetaASV sharing rate
-      # Uses asv_mapping_final.tsv to bridge original ASV hashes to MetaASV
+      # Uses asv_metaasv_map.tsv to bridge original ASV hashes to MetaASV
       # IDs. For each MetaASV, counts how many distinct studies contribute
       # detections. The sharing rate = proportion of MetaASVs in >= 2 studies.
       # -----------------------------------------------------------------------
@@ -1367,11 +1367,16 @@ for (taxa_level in TAXONOMIC_LEVELS) {
       shared_rate_before <- mean(study_presence$n_studies >= 2, na.rm = TRUE)
       .csf <- file.path(dirname(ASV_MAPPING), "cross_study_sharing.csv")
       if (file.exists(.csf)) {
-        .cs <- readr::read_csv(.csf, show_col_types = FALSE)
-        .v  <- setNames(.cs$value, .cs$metric)
-        if (is.finite(.v[["share_rate_before"]])) {
-          shared_rate_before <- as.numeric(.v[["share_rate_before"]])
-          cat("  Baseline from untrimmed sequence identity (not MetaASV membership)\n")
+        .cs <- tryCatch(readr::read_csv(.csf, show_col_types = FALSE),
+                        error = function(e) NULL)
+        if (!is.null(.cs) && nrow(.cs) > 0 &&
+            all(c("metric", "value") %in% names(.cs)) &&
+            "share_rate_before" %in% .cs$metric) {
+          .v <- setNames(.cs$value, .cs$metric)
+          if (is.finite(.v[["share_rate_before"]])) {
+            shared_rate_before <- as.numeric(.v[["share_rate_before"]])
+            cat("  Baseline from untrimmed sequence identity (not MetaASV membership)\n")
+          }
         }
       }
 
@@ -1465,7 +1470,7 @@ for (taxa_level in TAXONOMIC_LEVELS) {
 
     } else {
       cat("  ⚠ ASV mapping file not found — ASV-level cross-study sharing skipped\n")
-      cat("    (Provide asv_mapping_final.tsv in BASE_DIR to enable)\n")
+      cat("    (Provide asv_metaasv_map.tsv in BASE_DIR to enable)\n")
     }
   } else {
     cat("  ⚠ StudyID not in metadata — Tier 2A skipped\n")
@@ -1505,9 +1510,9 @@ tryCatch({
     scale_fill_manual(values = shared_pal, drop = FALSE) +
     labs(title = sprintf("%s composition after (%s level)", display_rank, taxa_level))
 
-  ggsave(file.path(level_plot, sprintf("09_%s_tax_before.pdf", tolower(taxa_level))),
+  ggsave(file.path(level_plot, sprintf("08_%s_tax_before.pdf", tolower(taxa_level))),
          p_bar_b, width = 12, height = 7)
-  ggsave(file.path(level_plot, sprintf("10_%s_tax_after.pdf",  tolower(taxa_level))),
+  ggsave(file.path(level_plot, sprintf("09_%s_tax_after.pdf",   tolower(taxa_level))),
          p_bar_a, width = 12, height = 7)
   cat("  ✓ Composition bar plots saved\n")
 }, error = function(e) cat("  Composition plots failed:", conditionMessage(e), "\n"))
@@ -1570,7 +1575,7 @@ tryCatch({
     # Hub nodes = top 10% by degree in the BEFORE network.
     # At ASV level: BEFORE nodes are original hashes, AFTER nodes are
     # MetaASV IDs — names never match directly. Translate hub hashes
-    # to MetaASV IDs via asv_mapping_final.tsv before comparing.
+    # to MetaASV IDs via asv_metaasv_map.tsv before comparing.
     # At Genus/Family level: names match directly.
     # ------------------------------------------------------------------
     deg_b   <- igraph::degree(g_b)
@@ -1634,25 +1639,25 @@ tryCatch({
         net_list <- list(Before = net_b, After = net_a)
         net_list <- cal_module(net_list, undirected_method = "cluster_fast_greedy")
         na_full  <- cal_network_attr(net_list)
-        write_csv(na_full, file.path(level_out, "network_attributes_full.csv"))
+        write_csv(na_full, file.path(level_out, "network_attributes_per_node.csv"))
 
         node_ov  <- node_comp(net_list, property = "name")
         node_vn  <- trans_venn$new(node_ov, ratio = "numratio")
         g_nv     <- node_vn$plot_venn(fill_color = FALSE)
-        ggsave(file.path(level_plot, sprintf("14_%s_node_overlap.pdf", tolower(taxa_level))),
+        ggsave(file.path(level_plot, sprintf("10_%s_node_overlap.pdf", tolower(taxa_level))),
                g_nv, width = 7, height = 6)
 
         edge_ov  <- edge_comp(net_list)
         edge_vn  <- trans_venn$new(edge_ov, ratio = "numratio")
         g_ev     <- edge_vn$plot_venn(fill_color = FALSE)
-        ggsave(file.path(level_plot, sprintf("15_%s_edge_overlap.pdf", tolower(taxa_level))),
+        ggsave(file.path(level_plot, sprintf("11_%s_edge_overlap.pdf", tolower(taxa_level))),
                g_ev, width = 7, height = 6)
 
         rob <- robustness$new(net_list,
                               remove_strategy = c("edge_rand", "node_degree_high"),
                               remove_ratio    = seq(0, 0.99, 0.1),
                               measure         = "Eff", run = 10)
-        ggsave(file.path(level_plot, sprintf("16_%s_robustness.pdf", tolower(taxa_level))),
+        ggsave(file.path(level_plot, sprintf("12_%s_robustness.pdf", tolower(taxa_level))),
                rob$plot(linewidth = 1), width = 12, height = 8)
         cat("  ✓ meconetcomp analyses saved\n")
       }, error = function(e) {
@@ -1663,10 +1668,10 @@ tryCatch({
 # Export networks for Gephi
 tryCatch({
   igraph::write_graph(g_b,
-    file.path(level_out, sprintf("12_%s_network_before.graphml", tolower(taxa_level))),
+    file.path(level_out, sprintf("%s_network_before.graphml", tolower(taxa_level))),
     format = "graphml")
   igraph::write_graph(g_a,
-    file.path(level_out, sprintf("13_%s_network_after.graphml", tolower(taxa_level))),
+    file.path(level_out, sprintf("%s_network_after.graphml", tolower(taxa_level))),
     format = "graphml")
   cat("  ✓ Network graphs exported for Gephi (GraphML format)\n")
 }, error = function(e) cat("  ⚠ Network export failed:", conditionMessage(e), "\n"))
@@ -1757,7 +1762,7 @@ tryCatch({
       ) %>% arrange(Spearman_rho)
 
       write_tsv(cor_tbl,
-                file.path(level_out, sprintf("tier4_%s_abundance_concordance.tsv",
+                file.path(level_out, sprintf("%s_abundance_concordance.tsv",
                                              tolower(taxa_level))))
 
       # Histogram
@@ -1777,7 +1782,7 @@ tryCatch({
              x = "Spearman rho (before vs after)", y = "Taxa") +
         theme_bw() +
         theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-      ggsave(file.path(level_plot, sprintf("17_%s_abundance_concordance.pdf",
+      ggsave(file.path(level_plot, sprintf("13_%s_abundance_concordance.pdf",
                                            tolower(taxa_level))),
              p_cor, width = 8, height = 5)
       cat("  ✓ Abundance concordance plot saved\n")

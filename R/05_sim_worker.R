@@ -21,8 +21,8 @@
 #   - output/intermediate/simulation_tasks.csv        Task manifest from Stage 4
 #   - output/intermediate/simulation_reference_subset.fasta  SILVA subset
 #   - output/intermediate/study_alignment_coords.csv  (study mode)
-#   - output/intermediate/primer_coords_phase1_output.csv (primer mode)
-#   - output/intermediate/consensusregioninfo.csv     Consensus region bounds
+#   - output/intermediate/primer_coordinates.csv (primer mode)
+#   - output/intermediate/consensus_region_info.csv     Consensus region bounds
 #   - Command-line args: TASK_ID, SEED
 #
 # OUTPUTS:
@@ -167,14 +167,14 @@ if (ANALYSIS_MODE == "study") {
   message(sprintf("  -> Study Mode: Loaded coordinates for %s", TASK_ID))
 
   # Load global consensus region (computed by 04_prepare_sims.R)
-  consensus_path <- file.path(OUTDIR, "intermediate/consensusregioninfo.csv")
+  consensus_path <- file.path(OUTDIR, "intermediate/consensus_region_info.csv")
 
   if (file.exists(consensus_path)) {
     consensus_info <- readr::read_csv(consensus_path, show_col_types = FALSE)
     consensus_start_global <- consensus_info$ConsensusStart[1]
     consensus_end_global <- consensus_info$ConsensusEnd[1]
   } else {
-    stop("FATAL: consensusregioninfo.csv not found.\n",
+    stop("FATAL: consensus_region_info.csv not found.\n",
          "This file is created by scripts/04_prepare_sims.R\n",
          "Run: Rscript scripts/04_prepare_sims.R")
   }
@@ -182,7 +182,7 @@ if (ANALYSIS_MODE == "study") {
 } else if (ANALYSIS_MODE == "primer") {
 
   # --- PRIMER MODE: theoretical coordinates from primer binding sites ---
-  coords_path <- file.path(OUTDIR, "intermediate/primer_coords_phase1_output.csv")
+  coords_path <- file.path(OUTDIR, "intermediate/primer_coordinates.csv")
 
   if (!file.exists(coords_path)) {
     stop("FATAL: Primer coordinates file missing.\n",

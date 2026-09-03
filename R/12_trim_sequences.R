@@ -19,7 +19,7 @@
 #       Study roster (or auto/roster mode via env vars)
 #   - output/intermediate/study_alignment_coords.csv
 #       Per-study SILVA alignment start/end coordinates
-#   - output/intermediate/consensusregioninfo.csv
+#   - output/intermediate/consensus_region_info.csv
 #       Global consensus region boundaries (ConsensusStart, ConsensusEnd)
 #   - output/intermediate/aligned_fastas/{study}_aligned.fasta
 #       SILVA-aligned FASTA files per study
@@ -123,13 +123,13 @@ cat(sprintf("Targeting %d selected studies...\n", length(selected_studies)))
 
 # --- Load Alignment Coordinates and Consensus Region ---
 # study_alignment_coords.csv maps each study to its SILVA alignment column range.
-# consensusregioninfo.csv defines the global consensus start/end columns that
+# consensus_region_info.csv defines the global consensus start/end columns that
 # all studies will be trimmed to.
 coords_file <- file.path(OUTDIR, "intermediate", "study_alignment_coords.csv")
 if (!file.exists(coords_file)) stop("FATAL: Coordinates file not found: ", coords_file)
 coords <- read_csv(coords_file, show_col_types = FALSE)
 
-consensus_file <- file.path(OUTDIR, "intermediate", "consensusregioninfo.csv")
+consensus_file <- file.path(OUTDIR, "intermediate", "consensus_region_info.csv")
 if (!file.exists(consensus_file)) stop("FATAL: Consensus region file not found: ", consensus_file)
 consensus_info <- read_csv(consensus_file, show_col_types = FALSE)
 

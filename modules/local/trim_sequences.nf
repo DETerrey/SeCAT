@@ -21,7 +21,7 @@ process TRIM_SEQUENCES {
     mkdir -p aggregated_data intermediate/aligned_fastas standardized_datasets
     cp ${selected_file}   aggregated_data/selected_studies_for_trim.txt
     cp ${study_coords}    intermediate/study_alignment_coords.csv
-    cp ${consensus_info}  intermediate/consensusregioninfo.csv
+    cp ${consensus_info}  intermediate/consensus_region_info.csv
     ln -s ${absOutdir}/intermediate/aligned_fastas/* intermediate/aligned_fastas/ 2>/dev/null || true
     export SECAT_MANIFEST="${params.manifest}"
     export SECAT_ANALYSIS_MODE="${params.analysis_mode}"

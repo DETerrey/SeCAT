@@ -34,7 +34,7 @@
 #       Length-weighted best taxonomy per MetaASV
 #   - output/meta_analysis/combined_metadata.tsv
 #       Harmonised metadata across all studies
-#   - output/meta_analysis/asv_mapping_final.tsv
+#   - output/meta_analysis/asv_metaasv_map.tsv
 #       Full mapping from original ASV IDs to MetaASV IDs
 #   - output/comparison/post_consensus/  (trimmed outputs)
 #   - output/comparison/pre_consensus/   (untrimmed originals for comparison)
@@ -566,7 +566,7 @@ final_map <- tibble(
   )
 
 # Persist the full mapping for provenance and downstream re-analysis
-write_tsv(final_map, file.path(OUTPUT_DIR, "asv_mapping_final.tsv"))
+write_tsv(final_map, file.path(OUTPUT_DIR, "asv_metaasv_map.tsv"))
 
 # Verify mapping integrity
 cat(sprintf("\n  Mapping table: %d rows\n", nrow(final_map)))
