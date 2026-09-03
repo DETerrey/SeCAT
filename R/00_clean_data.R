@@ -70,6 +70,10 @@ MANIFEST_OUT <- file.path(OUTDIR, "cleaned_data", "secat_manifest_clean.tsv")
 dir.create(file.path(OUTDIR, "cleaned_data"), recursive = TRUE, showWarnings = FALSE)
 
 # --- Filtering Thresholds ---
+# Remove non-target organellar lineages (chloroplast / mitochondrial 16S)?
+# Controlled by params.remove_organelles (default true); set false only when
+# organellar sequences are themselves the study target.
+REMOVE_ORGANELLES <- tolower(Sys.getenv("SECAT_REMOVE_ORGANELLES", unset = "true")) %in% c("true", "1", "yes")
 # Regex for non-target organellar lineages commonly retained in 16S datasets
 TAXA_TO_REMOVE       <- "Chloroplast|Mitochondria"
 # Studies with fewer samples than this after filtering are excluded entirely
@@ -593,10 +597,15 @@ for (p in unique(c(dirname(clean_counts), dirname(clean_taxonomy),
   message("  [2/4] Filtering Taxonomy...")
   tax_df    <- load_table_robust(orig_taxonomy, "ASV_ID")
   tax_col   <- names(tax_df)[2]
-  tax_clean <- tax_df %>%
-    filter(!grepl(TAXA_TO_REMOVE, .data[[tax_col]], ignore.case = TRUE))
-  message(sprintf("     - Removed %d ASVs matching Chloroplast/Mitochondria",
-                  nrow(tax_df) - nrow(tax_clean)))
+  if (REMOVE_ORGANELLES) {
+    tax_clean <- tax_df %>%
+      filter(!grepl(TAXA_TO_REMOVE, .data[[tax_col]], ignore.case = TRUE))
+    message(sprintf("     - Removed %d ASVs matching Chloroplast/Mitochondria",
+                    nrow(tax_df) - nrow(tax_clean)))
+  } else {
+    tax_clean <- tax_df
+    message("     - Organelle removal disabled (remove_organelles = false)")
+  }
   write_tsv(tax_clean, clean_taxonomy)
   valid_asvs <- tax_clean[["ASV_ID"]]
 

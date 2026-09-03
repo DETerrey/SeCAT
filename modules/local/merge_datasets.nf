@@ -53,7 +53,10 @@ process MERGE_DATASETS {
     ln -s ${absOutdir}/intermediate/aligned_fastas \
           intermediate/aligned_fastas 2>/dev/null || true
 
-    export SECAT_MANIFEST="${params.manifest}"
+    # Cleaned manifest, so the merged dataset honours CLEAN_DATA's sample and
+    # taxonomy filters (v5.0.6 fix: previously the raw manifest was used here,
+    # so filtered samples re-entered the merged output).
+    export SECAT_MANIFEST="${absOutdir}/cleaned_data/secat_manifest_clean.tsv"
     export SECAT_ANALYSIS_MODE="${params.analysis_mode}"
     export SECAT_VSEARCH_PATH="vsearch"
     export SECAT_MERGE_METHOD="${params.merge_method}"

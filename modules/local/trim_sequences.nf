@@ -23,7 +23,7 @@ process TRIM_SEQUENCES {
     cp ${study_coords}    intermediate/study_alignment_coords.csv
     cp ${consensus_info}  intermediate/consensus_region_info.csv
     ln -s ${absOutdir}/intermediate/aligned_fastas/* intermediate/aligned_fastas/ 2>/dev/null || true
-    export SECAT_MANIFEST="${params.manifest}"
+    export SECAT_MANIFEST="${absOutdir}/cleaned_data/secat_manifest_clean.tsv"
     export SECAT_ANALYSIS_MODE="${params.analysis_mode}"
     export SECAT_MIN_CONSENSUS_COVERAGE="${params.min_consensus_coverage}"
     export SECAT_OUTDIR="."

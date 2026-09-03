@@ -255,7 +255,16 @@ workflow STANDARDIZE {
                           checkIfExists: true)
     aggregated_dir = file("${params.outdir}/aggregated_data", checkIfExists: true)
 
-    manifest_file   = file(params.manifest, checkIfExists: true)
+    // v5.0.6 fix: trim/merge from the CLEANED manifest, so the standardized
+    // dataset honours CLEAN_DATA's sample and taxonomy filters. Requires the
+    // cleaned_data/ tree from the analysis run (kept during the run; rerun the
+    // analysis step first if it was removed post-run).
+    manifest_file   = file("${params.outdir}/cleaned_data/secat_manifest_clean.tsv")
+    if (!manifest_file.exists()) {
+        error "Cleaned manifest not found: ${manifest_file}\n" +
+              "The standardize step trims and merges from CLEAN_DATA's outputs. " +
+              "Re-run the analysis step (or re-run with -resume) so cleaned_data/ exists."
+    }
     manifest_lines  = manifest_file.readLines()
     manifest_headers = manifest_lines[0].split('\t') as List
 

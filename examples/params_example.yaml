@@ -27,8 +27,8 @@ outdir: "output"
 # Single consolidated user-facing results directory. After a successful full
 # run, this is the only folder you need to look in for results.
 # Default: ${outdir}/final_outputs
-# Override to a separate location, e.g. /home/users/dterrey/SeCAT_results
-# final_outputs: "/home/users/dterrey/SeCAT_results"
+# Override to a separate location, e.g. /path/to/SeCAT_results
+# final_outputs: "/path/to/SeCAT_results"
 
 # If true, intermediate publishDir trees (cleaned_data, intermediate, etc.)
 # are kept after the run. Default false — they are removed to save disk space,
@@ -42,11 +42,15 @@ keep_intermediates: false
 analysis_mode: "study"
 
 # ── PIPELINE FLOW ─────────────────────────────────────────────────────────────
-# auto_trim=false  → pipeline pauses after verdicts. You manually review,
-#                    edit the roster file, then re-run with --step standardize -resume.
-# auto_trim=true   → end-to-end, no pause. Use only on previously vetted data.
+# The pipeline pauses after per-study verdicts so you can review them and edit
+# the roster file, then re-run with --step standardize -resume.
 auto_trim:      false
 run_validation: true
+
+# Remove chloroplast and mitochondrial ASVs during cleaning (recommended for
+# bacterial/archaeal 16S surveys). Set false only if organellar sequences are
+# themselves the study target.
+remove_organelles: true
 
 # Study selection at the trim step. "roster" reads the file below; "auto" includes
 # every KEEP-verdict study.
